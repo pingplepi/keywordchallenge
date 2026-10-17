@@ -40,10 +40,10 @@ def collect(output):
     coverage = []
     for category in categories:
         cid = str(category['id'])
-        if cid in completed:
+        if cid in completed and completed[cid]['total'] == completed[cid].get('sourceTotal', completed[cid]['total']):
             result = completed[cid]
         else:
-            rows = {}
+            rows = {item['id']: item for item in completed.get(cid, {}).get('items', [])}
             # Naver includes mission keywords in the total but serves them separately.
             missions = request(f'https://gw.in.naver.com/keyword-challenge/api/v2/categories/{cid}/mission-keywords?categoryId={cid}')
             for item in missions['data']:
@@ -56,7 +56,8 @@ def collect(output):
             for pass_number in range(3):
                 cursor, seen = None, set()
                 while True:
-                    paging = {'limit': 500}
+                    # Vary page boundaries when equal participant counts cause unstable ordering.
+                    paging = {'limit': (500, 333, 257)[pass_number]}
                     if cursor is not None:
                         paging['cursor'] = cursor
                     page = request('https://in.naver.com/graphql', {
@@ -82,22 +83,28 @@ def collect(output):
                 if len(rows) == total:
                     break
                 print(f"{category['name']}: reconciling {len(rows):,} / {total:,}", flush=True)
-            if len(rows) != total:
-                raise RuntimeError(f"{category['name']}: expected {total}, received {len(rows)}; catalog was not published")
-            result = {'total': total, 'items': list(rows.values())}
+            result = {'total': len(rows), 'sourceTotal': total, 'items': list(rows.values())}
             completed[cid] = result
             checkpoint.write_text(json.dumps(completed, ensure_ascii=False))
         for item in result['items']:
             if item['id'] in all_items:
                 raise RuntimeError('Duplicate keyword across categories')
             all_items[item['id']] = item
-        coverage.append({'field': category['name'], 'count': result['total']})
+        coverage.append({'field': category['name'], 'count': result['total'],
+                         'sourceTotal': result.get('sourceTotal', result['total'])})
         print(f"{category['name']}: {result['total']:,}", flush=True)
-    data = {'version': '3.0', 'source': '네이버 공개 키워드 목록', 'coverage': 'all',
+    differences = [c for c in coverage if c['count'] != c['sourceTotal']]
+    difference_count = sum(abs(c['sourceTotal'] - c['count']) for c in differences)
+    source = '네이버 공개 키워드 목록'
+    if differences:
+        source += f' · 원본 표시 총계와 {difference_count}개 차이'
+    data = {'version': '3.0', 'source': source, 'coverage': 'partial' if differences else 'all',
             'collectedAt': started, 'finishedAt': datetime.datetime.now(datetime.timezone.utc).isoformat(),
-            'categories': coverage, 'items': list(all_items.values())}
+            'categories': coverage, 'discrepancies': differences, 'items': list(all_items.values())}
     output.write_text(json.dumps(data, ensure_ascii=False))
     print(f"Saved {len(all_items):,} keywords / {len(categories)} fields to {output}", flush=True)
+    if differences:
+        print('Source count discrepancies: ' + json.dumps(differences, ensure_ascii=False), flush=True)
 
 
 if __name__ == '__main__':
