@@ -53,6 +53,7 @@ async function onSessionChanged(nextSession) {
   const version = ++sessionVersion;
   const changedUser = session?.user.id !== nextSession?.user.id;
   session = nextSession;
+  showPage();
   if (changedUser) {
     profiles.clear();
     activeId = '';
@@ -441,7 +442,8 @@ initialize();
 
 function showPage() {
   const hash = location.hash.slice(1);
-  const page = ['strategyView','catalogView','mySpace','catalogAdmin'].includes(hash) ? hash : 'strategyView';
+  const requestedPage = ['strategyView','catalogView','mySpace','catalogAdmin'].includes(hash) ? hash : 'strategyView';
+  const page = !session && requestedPage !== 'catalogView' ? 'authView' : requestedPage;
   document.body.dataset.page = page;
   document.querySelectorAll('.section-nav a').forEach(link => {
     const active = link.getAttribute('href') === `#${page}`;
