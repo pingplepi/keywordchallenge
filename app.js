@@ -1,5 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { createCatalog } from './catalog.js';
+import { createStrategy, connectSearchAd } from './strategy.js';
 
 const config = window.APP_CONFIG || {};
 const byId = (id) => document.getElementById(id);
@@ -11,6 +12,8 @@ let profiles = new Map();
 let activeId = '';
 let collectionController = null;
 let catalog;
+let strategy;
+let searchad;
 let sessionVersion = 0;
 let refreshSchedule = null;
 let refreshViewVersion = 0;
@@ -63,11 +66,14 @@ async function onSessionChanged(nextSession) {
     activeId = '';
     showView('auth');
     void catalog?.setContext(null, null);
+    void strategy?.setContext(null, null);
     return;
   }
   showView('app');
   byId('accountEmail').textContent = session.user.email || '로그인됨';
   void catalog?.setContext(session.user, profiles.get(activeId) || null);
+  void strategy?.setContext(session.user, profiles.get(activeId) || null);
+  void searchad?.status();
   await loadProfiles(version);
 }
 
@@ -125,6 +131,7 @@ function setActive(id) {
   renderTable();
   void renderRefreshSettings();
   void catalog?.setContext(session?.user || null, profiles.get(activeId));
+  void strategy?.setContext(session?.user || null, profiles.get(activeId));
 }
 
 const koreanTime = (value) => new Date(value).toLocaleString('ko-KR', {
@@ -395,6 +402,8 @@ async function initialize() {
     auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true },
   });
   catalog = createCatalog(supabase);
+  strategy = createStrategy(supabase);
+  searchad = connectSearchAd(supabase, () => strategy.refresh());
   void catalog.initialize();
   await loadRefreshSchedule();
   const { data: { session: currentSession }, error } = await supabase.auth.getSession();
@@ -419,3 +428,16 @@ byId('exportButton').addEventListener('click', exportBackup);
 byId('importInput').addEventListener('change', importFiles);
 for (const id of ['searchInput', 'rankFilter', 'sortSelect']) byId(id).addEventListener('input', renderTable);
 initialize();
+
+function showPage() {
+  const hash = location.hash.slice(1);
+  const page = ['strategyView','catalogView','mySpace','catalogAdmin'].includes(hash) ? hash : 'strategyView';
+  document.body.dataset.page = page;
+  document.querySelectorAll('.section-nav a').forEach(link => {
+    const active = link.getAttribute('href') === `#${page}`;
+    link.classList.toggle('active', active);
+    if (active) link.setAttribute('aria-current','page'); else link.removeAttribute('aria-current');
+  });
+}
+window.addEventListener('hashchange', () => { showPage(); window.scrollTo({ top: 0, behavior: 'instant' }); });
+showPage();

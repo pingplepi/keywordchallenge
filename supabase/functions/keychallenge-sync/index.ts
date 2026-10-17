@@ -1,5 +1,6 @@
 import { createClient } from 'npm:@supabase/supabase-js@2.118.0';
 import { collectProfilePage, categories, missions, catalogPage, CollectionError } from './naver.ts';
+import { fetchVolumes, SearchAdError } from '../_shared/searchad.ts';
 
 const db = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!, {
   auth: { persistSession: false, autoRefreshToken: false },
@@ -22,8 +23,10 @@ async function checkpoint(job: any, extra: Record<string, unknown> = {}) {
 async function status(job: any, value: string, error: string | null = null) {
   if (job.kind === 'profile') {
     await result(db.from('keychallenge_profiles').update({ scheduled_status: value, scheduled_error: error }).eq('id', job.profile_id));
-  } else {
+  } else if (job.kind === 'catalog') {
     await result(db.from('keychallenge_refresh_schedule').update({ catalog_status: value, catalog_error: error }).eq('singleton', true));
+  } else {
+    await result(db.from('keychallenge_searchad_status').update({ last_error: error, updated_at: now() }).eq('singleton', true));
   }
 }
 async function cancel(job: any) {
@@ -143,6 +146,24 @@ async function catalogStep(job: any) {
   return false;
 }
 
+async function volumeStep(job: any) {
+  const { data: settings } = await result(db.from('keychallenge_searchad_status').select('enabled').eq('singleton', true).single());
+  if (!settings.enabled) { await cancel(job); return true; }
+  const { data: hints } = await result(db.rpc('keychallenge_volume_candidates', { p_limit: 5 }));
+  if (!hints.length || (job.state.processed || 0) >= 4000) {
+    await checkpoint(job, { status: 'succeeded', state: {}, completed_at: now(), lease_token: null, lease_until: null });
+    await result(db.from('keychallenge_searchad_status').update({ last_success_at: now(), last_error: null }).eq('singleton', true));
+    return true;
+  }
+  if (!job.credentials) ({ data: job.credentials } = await result(db.rpc('keychallenge_searchad_credentials')));
+  if (!job.credentials) throw new SearchAdError(401, '관리자가 검색광고 API 연결을 완료해야 합니다.');
+  const rows = await fetchVolumes(job.credentials, hints.map((item: any) => item.name));
+  await result(db.rpc('keychallenge_store_search_volumes', { p_rows: rows }));
+  job.state.processed = (job.state.processed || 0) + hints.length;
+  await checkpoint(job);
+  return false;
+}
+
 Deno.serve(async (request: Request) => {
   if (request.method !== 'POST') return reply(405, { error: 'Method not allowed' });
   // This endpoint is server-to-server. Its private Vault credential is checked before work is claimed.
@@ -161,9 +182,9 @@ Deno.serve(async (request: Request) => {
     await status(job, 'running');
     const started = Date.now();
     for (let pages = 0; pages < 20 && Date.now() - started < 22_000; pages += 1) {
-      const done = job.kind === 'profile' ? await profileStep(job) : await catalogStep(job);
+      const done = job.kind === 'profile' ? await profileStep(job) : job.kind === 'volume' ? await volumeStep(job) : await catalogStep(job);
       if (done) return reply(200, { status: 'finished', kind: job.kind });
-      await new Promise(resolve => setTimeout(resolve, 300));
+      await new Promise(resolve => setTimeout(resolve, job.kind === 'volume' ? 500 : 300));
     }
     await checkpoint(job, { status: 'queued', attempts: 0, last_error: null, lease_token: null, lease_until: null });
     return reply(200, { status: 'continuing', kind: job.kind });
@@ -172,9 +193,10 @@ Deno.serve(async (request: Request) => {
     if (job) {
       const attempts = job.attempts + 1;
       const failed = attempts >= 4;
-      const message = error instanceof CollectionError ? error.message : '서버 연결 문제로 예약 수집을 완료하지 못했습니다.';
+      const sourceError = error instanceof CollectionError || error instanceof SearchAdError;
+      const message = sourceError ? error.message : '서버 연결 문제로 예약 수집을 완료하지 못했습니다.';
       // Rate limits back off for at least 15 minutes. Other failures back off 5/15/45 minutes.
-      const delay = error instanceof CollectionError && error.status === 429 ? Math.max(15, 5 * 3 ** (attempts - 1)) : 5 * 3 ** (attempts - 1);
+      const delay = sourceError && error.status === 429 ? Math.max(15, 5 * 3 ** (attempts - 1)) : 5 * 3 ** (attempts - 1);
       try {
         await checkpoint(job, { status: failed ? 'failed' : 'queued', attempts, last_error: message,
           next_attempt_at: new Date(Date.now() + delay * 60_000).toISOString(),

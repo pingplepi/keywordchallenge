@@ -7,3 +7,6 @@ verify_jwt = true
 # Private server scheduler, authenticated with its own Vault credential.
 [functions.keychallenge-sync]
 verify_jwt = false
+
+[functions.keychallenge-searchad]
+verify_jwt = true

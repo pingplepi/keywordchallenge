@@ -17,7 +17,9 @@
           <button id="signOutButton" class="button button-quiet" type="button">로그아웃</button>
         </div>
       </header>
-      <nav class="section-nav" aria-label="대시보드 메뉴"><a href="#catalogView">전체 키워드</a><a href="#mySpace">내 참여 현황</a><a id="adminNav" href="#catalogAdmin" hidden>목록 관리</a></nav>
+      <nav class="section-nav" aria-label="대시보드 메뉴"><a href="#strategyView">대시보드</a><a href="#catalogView">전체 키워드</a><a href="#mySpace">수집·예약 관리</a><a id="adminNav" href="#catalogAdmin" hidden>관리자 설정</a></nav>
+
+      <section id="strategyView" hidden aria-label="키워드 챌린지 대시보드"></section>
 
       <section id="catalogView" hidden aria-labelledby="catalogTitle">
         <div class="catalog-hero"><div><p class="eyebrow">ALL FIELDS · KEYWORD EXPLORER</p><h1 id="catalogTitle">다음 키워드를<br /><span>발견하는 곳.</span></h1><p class="muted">여행부터 뷰티, 푸드, 테크까지.<br />아직 참여하지 않은 키워드도 한곳에서 찾아보세요.</p></div><div class="catalog-summary panel"><span id="catalogCoverage" class="status-pill">목록 준비 중</span><strong><span id="catalogTotal">—</span><small>개 키워드</small></strong><div><span id="catalogFieldCount">—</span>개 분야 · 로그인 없이 검색</div><p id="catalogDate" class="muted">불러오는 중</p></div></div>
@@ -32,6 +34,13 @@
       </section>
 
       <section id="catalogAdmin" class="panel admin-panel" hidden aria-labelledby="adminTitle">
+        <section id="searchadSettings" class="searchad-settings">
+          <p class="eyebrow">SEARCH VOLUME CONNECTION</p><h2>네이버 월 검색량 연결</h2><span id="searchadState" class="status-pill">검색광고 연결 대기</span>
+          <p class="muted">네이버 검색광고의 API 사용 관리에 있는 값을 입력해 주세요. 고객 ID와 키는 내 Supabase에 암호화하여 저장하고, 네이버 검색량 조회에만 사용합니다. 일반 회원에게는 노출되지 않습니다.</p>
+          <form id="searchadForm" autocomplete="off"><div class="admin-fields"><label>고객 ID (Customer ID)<input id="searchadCustomer" inputmode="numeric" pattern="[0-9]{1,20}" maxlength="20" required autocomplete="off" /></label><label>API License<input id="searchadApi" type="password" maxlength="1024" required autocomplete="off" /></label><label>Secret Key<input id="searchadSecret" type="password" maxlength="1024" required autocomplete="off" /></label></div><button id="searchadSave" class="button" type="submit">연결 저장 · 검색량 수집 시작</button></form>
+          <button id="searchadPause" class="button button-quiet" type="button" hidden>검색량 수집 일시 중지</button><p id="searchadStatus" class="message" role="status"></p>
+          <p class="muted small">월 검색량은 PC+모바일 합산입니다. ‘10 미만’ 응답은 범위로 표시합니다. 매일 오전 4시 15분부터 미수집·30일 지난 데이터를 순차 갱신합니다.</p>
+        </section>
         <p class="eyebrow">CATALOG ADMIN</p><h2 id="adminTitle">공용 키워드 목록 관리</h2>
         <p class="muted">등록한 목록은 모든 방문자에게 공개됩니다. 키워드 이름·분야·참여자 수만 등록하며, 회원의 개인 수집 데이터는 별도로 보관됩니다.</p>
         <form id="catalogImportForm"><fieldset id="catalogImportControls">
