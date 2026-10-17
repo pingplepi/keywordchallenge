@@ -21,6 +21,5 @@ html{scroll-behavior:smooth;scroll-padding-top:24px}.section-nav{display:flex;ga
 .footer-creators a{color:#72677f;text-decoration:underline;text-decoration-color:#b9b0c4;text-underline-offset:4px;font-weight:600}
 .footer-creators a:hover,.footer-service:hover{color:var(--accent)}
 .site-footer a:focus-visible{outline:2px solid var(--accent);outline-offset:5px;border-radius:2px}
-.footer-copyright{margin:12px 0 0;font-size:11px;color:#98929f}
 @media(max-width:800px){.site-footer{margin-top:32px}.footer-line{align-items:flex-start;gap:8px 16px}.footer-creators{width:100%}.site-footer>.shell{padding-top:22px;padding-bottom:24px}}
-@media(max-width:520px){.footer-line{display:block}.footer-note{margin:7px 0 10px;font-size:12px}.footer-creators{font-size:12px}.footer-copyright{font-size:10px}}
+@media(max-width:520px){.footer-line{display:block}.footer-note{margin:7px 0 10px;font-size:12px}.footer-creators{font-size:12px}}
