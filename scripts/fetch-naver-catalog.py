@@ -44,6 +44,14 @@ def collect(output):
             result = completed[cid]
         else:
             rows = {}
+            # Naver includes mission keywords in the total but serves them separately.
+            missions = request(f'https://gw.in.naver.com/keyword-challenge/api/v2/categories/{cid}/mission-keywords?categoryId={cid}')
+            for item in missions['data']:
+                rows[str(item['id'])] = {
+                    'id': str(item['id']), 'name': item['name'], 'categoryId': cid,
+                    'field': category['name'], 'fieldGroup': category['group'],
+                    'participantCount': item.get('participantCount')
+                }
             total = category['keywordCount']
             for pass_number in range(3):
                 cursor, seen = None, set()
