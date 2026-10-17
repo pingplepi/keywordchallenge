@@ -383,10 +383,14 @@ async function handleAuthSubmit(event) {
       const { error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) throw error;
       setAuthMessage('로그인했습니다.', 'success');
+      window.location.replace('#strategyView');
     } else {
       const { data, error } = await supabase.auth.signUp({ email, password, options: { emailRedirectTo: window.location.origin } });
       if (error) throw error;
-      if (data.session) setAuthMessage('계정이 만들어졌습니다.', 'success');
+      if (data.session) {
+        setAuthMessage('계정이 만들어졌습니다.', 'success');
+        window.location.replace('#strategyView');
+      }
       else setAuthMessage('계정이 만들어졌습니다. 이메일 인증을 완료한 뒤 로그인해 주세요.', 'success');
     }
   } catch (error) { setAuthMessage(error.message, 'error'); }
