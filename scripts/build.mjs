@@ -11,6 +11,6 @@ if (supabaseUrl && !/^https:\/\/[a-z0-9-]+\.supabase\.co\/?$/i.test(supabaseUrl)
 }
 
 mkdirSync(output, { recursive: true });
-for (const file of ['index.html', 'styles.css', 'app.js']) cpSync(resolve(root, file), resolve(output, file));
+for (const file of ['index.html', 'styles.css', 'app.js', 'catalog.js']) cpSync(resolve(root, file), resolve(output, file));
 writeFileSync(resolve(output, 'config.js'), `window.APP_CONFIG = ${JSON.stringify({ SUPABASE_URL: supabaseUrl, SUPABASE_ANON_KEY: anonKey })};\n`);
 console.log(`Static site prepared in ${output}`);

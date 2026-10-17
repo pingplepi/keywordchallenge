@@ -5,3 +5,4 @@ dist/
 !.env.example
 config.js
 .DS_Store
+supabase/.temp/

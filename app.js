@@ -1,4 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { createCatalog } from './catalog.js';
 
 const config = window.APP_CONFIG || {};
 const byId = (id) => document.getElementById(id);
@@ -9,7 +10,8 @@ let authMode = 'signin';
 let profiles = new Map();
 let activeId = '';
 let relayKey = '';
-let allKeywords = [];
+let catalog;
+let sessionVersion = 0;
 
 function showView(name) {
   for (const [key, element] of Object.entries(views)) element.hidden = key !== name;
@@ -43,22 +45,36 @@ function normalizeId(value) {
 }
 
 async function onSessionChanged(nextSession) {
+  const version = ++sessionVersion;
+  const changedUser = session?.user.id !== nextSession?.user.id;
   session = nextSession;
+  if (changedUser) {
+    profiles.clear();
+    activeId = '';
+    relayKey = '';
+    byId('dashboard').hidden = true;
+    byId('collectorGuide').hidden = true;
+    renderTabs();
+  }
   if (!session) {
     profiles.clear();
     activeId = '';
     showView('auth');
+    void catalog?.setContext(null, null);
     return;
   }
   showView('app');
   byId('accountEmail').textContent = session.user.email || '로그인됨';
-  await loadProfiles();
+  void catalog?.setContext(session.user, profiles.get(activeId) || null);
+  await loadProfiles(version);
 }
 
-async function loadProfiles() {
+async function loadProfiles(version = sessionVersion) {
   const { data, error } = await supabase.from('keychallenge_profiles')
     .select('influencer_id, owner_id, payload, updated_at')
+    .eq('user_id', session.user.id)
     .order('updated_at', { ascending: false });
+  if (version !== sessionVersion) return;
   if (error) {
     notify(`저장 데이터를 불러오지 못했습니다: ${error.message}`, true);
     return;
@@ -102,9 +118,10 @@ function setActive(id) {
   byId('dashboard').hidden = false;
   renderTabs();
   renderTable();
+  void catalog?.setContext(session?.user || null, profiles.get(activeId));
 }
 
-function rankIsValid(value) { return value !== null && value !== '' && Number.isFinite(Number(value)); }
+function rankIsValid(value) { return value !== null && value !== '' && Number.isFinite(Number(value)) && Number(value) > 0; }
 function rankValue(row) { return rankIsValid(row.rank) ? Number(row.rank) : Number.MAX_SAFE_INTEGER; }
 function formatDate(value) { return value ? escapeHtml(String(value).slice(0, 10)) : '—'; }
 function safeUrl(value) {
@@ -257,7 +274,7 @@ async function pollForPayload(token, id) {
 }
 
 function exportBackup() {
-  const backup = { version: '2.0', exportedAt: new Date().toISOString(), profiles: Object.fromEntries(profiles), allKeywords };
+  const backup = { version: '3.0', exportedAt: new Date().toISOString(), profiles: Object.fromEntries(profiles) };
   const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
   const link = document.createElement('a');
   link.href = URL.createObjectURL(blob);
@@ -307,7 +324,7 @@ async function handleAuthSubmit(event) {
       if (error) throw error;
       setAuthMessage('로그인했습니다.', 'success');
     } else {
-      const { data, error } = await supabase.auth.signUp({ email, password });
+      const { data, error } = await supabase.auth.signUp({ email, password, options: { emailRedirectTo: window.location.origin } });
       if (error) throw error;
       if (data.session) setAuthMessage('계정이 만들어졌습니다.', 'success');
       else setAuthMessage('계정이 만들어졌습니다. 이메일 인증을 완료한 뒤 로그인해 주세요.', 'success');
@@ -324,6 +341,8 @@ async function initialize() {
   supabase = createClient(config.SUPABASE_URL, config.SUPABASE_ANON_KEY, {
     auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true },
   });
+  catalog = createCatalog(supabase);
+  void catalog.initialize();
   const { data: { session: currentSession }, error } = await supabase.auth.getSession();
   if (error) notify(error.message, true);
   await onSessionChanged(currentSession);

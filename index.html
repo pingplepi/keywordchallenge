@@ -4,7 +4,8 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="theme-color" content="#f7f7fb" />
-    <title>키챌 대시보드</title>
+    <title>키챌 대시보드 · 모든 분야 키워드 탐색</title>
+    <meta name="description" content="네이버 인플루언서의 모든 분야 키워드를 검색하고, 내 참여 현황과 순위를 한곳에서 관리하세요." />
     <link rel="stylesheet" href="/styles.css" />
   </head>
   <body>
@@ -12,10 +13,36 @@
       <header class="topbar">
         <a class="brand" href="/"><span class="brand-mark">K</span><span>키챌 대시보드</span></a>
         <div class="account" id="accountBar" hidden>
-          <span id="accountEmail" class="muted"></span>
+          <span id="adminBadge" class="status-pill" hidden>관리자</span><span id="accountEmail" class="muted"></span>
           <button id="signOutButton" class="button button-quiet" type="button">로그아웃</button>
         </div>
       </header>
+      <nav class="section-nav" aria-label="대시보드 메뉴"><a href="#catalogView">전체 키워드</a><a href="#mySpace">내 참여 현황</a><a id="adminNav" href="#catalogAdmin" hidden>목록 관리</a></nav>
+
+      <section id="catalogView" hidden aria-labelledby="catalogTitle">
+        <div class="catalog-hero"><div><p class="eyebrow">ALL FIELDS · KEYWORD EXPLORER</p><h1 id="catalogTitle">다음 키워드를<br /><span>발견하는 곳.</span></h1><p class="muted">여행부터 뷰티, 푸드, 테크까지.<br />아직 참여하지 않은 키워드도 한곳에서 찾아보세요.</p></div><div class="catalog-summary panel"><span id="catalogCoverage" class="status-pill">목록 준비 중</span><strong><span id="catalogTotal">—</span><small>개 키워드</small></strong><div><span id="catalogFieldCount">—</span>개 분야 · 로그인 없이 검색</div><p id="catalogDate" class="muted">불러오는 중</p></div></div>
+        <section class="panel table-panel">
+          <div class="table-heading"><div><h2>전체 키워드 검색</h2><p id="catalogSource" class="muted">공용 키워드 목록을 불러오고 있습니다.</p></div></div>
+          <div class="catalog-filters"><label class="catalog-query">키워드<input id="catalogSearch" type="search" maxlength="100" placeholder="예: 제주, 캠핑, 피부관리" /></label><label>분야<select id="catalogField"><option value="">모든 분야</option></select></label><label>내 참여 여부<select id="catalogParticipation" disabled><option value="all">전체</option><option value="joined">참여 키워드</option><option value="unjoined">미참여 / 기록 없음</option></select></label><label>정렬<select id="catalogSort"><option value="participants_desc">참여자 많은순</option><option value="participants_asc">참여자 적은순</option><option value="name">이름순</option></select></label></div>
+          <div class="catalog-result-line"><strong id="catalogResultCount" aria-live="polite">불러오는 중…</strong><span id="catalogComparison" class="muted">로그인 후 내 참여 현황을 비교할 수 있습니다.</span></div>
+          <div id="catalogResults" class="table-wrap" aria-busy="true"></div>
+          <div class="pagination"><button id="catalogPrev" type="button" class="button button-light" disabled>이전</button><span id="catalogPage">1 / 1 페이지</span><button id="catalogNext" type="button" class="button button-light" disabled>다음</button></div>
+          <p class="catalog-footnote">참여자 수와 내 순위는 수집 시점 기준입니다. ‘미참여’는 참여 가능 여부를 뜻하지 않으며, 실제 챌린지는 네이버에서 본인 분야의 참여 기준을 확인해 주세요.</p>
+        </section>
+      </section>
+
+      <section id="catalogAdmin" class="panel admin-panel" hidden aria-labelledby="adminTitle">
+        <p class="eyebrow">CATALOG ADMIN</p><h2 id="adminTitle">공용 키워드 목록 관리</h2>
+        <p class="muted">등록한 목록은 모든 방문자에게 공개됩니다. 키워드 이름·분야·참여자 수만 등록하며, 회원의 개인 수집 데이터는 별도로 보관됩니다.</p>
+        <form id="catalogImportForm"><fieldset id="catalogImportControls">
+          <label>키워드 목록 JSON<input id="catalogFile" type="file" accept="application/json,.json" /></label>
+          <div id="catalogImportPreview" hidden><strong id="catalogPreviewSummary"></strong><p id="catalogPreviewFields" class="muted small"></p>
+            <div class="admin-fields"><label>목록 출처<input id="catalogImportSource" maxlength="160" required /></label><label>수집 기준일<input id="catalogImportDate" type="date" required /></label><label>수집 범위<select id="catalogImportCoverage"><option value="partial">일부 분야 / 일부 목록</option><option value="all">모든 분야 전체 수집 완료</option></select></label></div>
+            <button id="catalogPublish" type="submit" class="button" disabled>이 목록을 전체 사용자에게 공개</button>
+          </div>
+        </fieldset><p id="catalogImportMessage" class="message" role="status" aria-live="polite"></p></form>
+        <details><summary>목록 파일 형식</summary><p class="muted">JSON의 items 배열에 id, name, field, fieldGroup, categoryId, participantCount를 넣어 주세요. 수집기에서 만든 파일 또는 기존 전체 키워드 JSON을 사용할 수 있습니다. 키워드 ID는 문자열을 권장합니다.</p></details>
+      </section>
 
       <section id="setupView" class="panel setup" hidden>
         <p class="eyebrow">처음 한 번만 설정해 주세요</p>
@@ -24,11 +51,12 @@
         <a class="button" href="https://supabase.com/dashboard" target="_blank" rel="noreferrer">Supabase 열기 ↗</a>
       </section>
 
+      <div id="mySpace"></div>
       <section id="authView" class="auth-layout" hidden>
         <div class="intro">
           <p class="eyebrow">NAVER INFLUENCER · KEYCHALLENGE</p>
           <h1>내 키워드 챌린지를<br /><span>한곳에서 관리하세요.</span></h1>
-          <p class="muted">계정을 만들면 수집한 키워드와 순위를 본인 계정에 저장할 수 있습니다. 각 계정의 데이터는 분리되어 보관됩니다.</p>
+          <p class="muted">전체 목록은 로그인 없이 검색할 수 있습니다. 내 참여 여부와 순위를 비교하려면 사이트 계정을 만들어 주세요. 네이버 계정과는 별개이며, 여행을 포함한 모든 분야의 인플홈을 연결할 수 있습니다.</p>
           <div class="feature-list"><span>✓ 인플루언서별 데이터 관리</span><span>✓ 순위와 참여 현황 검색</span><span>✓ 내 데이터 백업 및 내보내기</span></div>
         </div>
         <form id="authForm" class="panel auth-card">
@@ -42,11 +70,11 @@
 
       <section id="appView" hidden>
         <div class="page-heading">
-          <div><p class="eyebrow">내 작업 공간</p><h1>키챌 대시보드</h1><p class="muted">인플루언서 ID를 입력해 키워드와 현재 순위를 관리하세요.</p></div>
+          <div><p class="eyebrow">내 작업 공간</p><h1>내 참여 현황</h1><p class="muted">인플홈을 수집하면 전체 목록에서 참여·미참여 키워드를 구분할 수 있습니다.</p></div>
         </div>
         <div id="notice" class="notice" role="status" hidden></div>
         <section class="panel collect-panel">
-          <div class="collect-form"><div class="input-grow"><label for="influencerInput">인플루언서 ID 또는 인플홈 주소</label><input id="influencerInput" placeholder="예: jiny_free_beauty 또는 in.naver.com/jiny_free_beauty" /></div><button id="collectButton" class="button" type="button">분석 / 수집 시작</button></div>
+          <div class="collect-form"><div class="input-grow"><label for="influencerInput">인플루언서 ID 또는 인플홈 주소</label><input id="influencerInput" placeholder="본인의 in.naver.com/아이디 주소를 입력하세요" /></div><button id="collectButton" class="button" type="button">분석 / 수집 시작</button></div>
           <div class="subtle">내 저장 데이터는 로그인한 계정에만 연결됩니다. 처음 수집할 때는 네이버 인플홈에서 수집기 코드를 직접 실행해야 합니다.</div>
           <div id="collectorGuide" class="collector-guide" hidden>
             <div class="guide-head"><div><strong>수집 결과 자동 전달</strong><p class="muted">아래 버튼으로 인플홈을 열고, 네이버 탭의 개발자 도구에서 복사한 수집기를 실행하세요.</p></div><span id="collectorStatus" class="status-pill">대기 중</span></div>
