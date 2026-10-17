@@ -220,12 +220,14 @@ async function startCollection() {
       controller.signal.throwIfAborted();
       if (session?.user.id !== userId) throw new DOMException('Session changed', 'AbortError');
       const page = await collectPage(id, cursor, controller.signal);
-      if (page.influencerId !== id || !Array.isArray(page.items) || !Number.isInteger(page.total) || page.total < 0 || page.total > 200000) {
+      const validTotal = Number.isInteger(page.total) && page.total >= 0 && page.total <= 200000;
+      if (page.influencerId !== id || !Array.isArray(page.items)
+          || (!validTotal && !(total !== null && page.total === null))) {
         throw new Error('목록 형식이 변경되어 수집을 완료하지 못했습니다.');
       }
       ownerId ??= page.ownerId;
       total ??= page.total;
-      if (ownerId !== page.ownerId || total !== page.total) {
+      if (ownerId !== page.ownerId || (page.total !== null && total !== page.total)) {
         throw new Error('수집 중 네이버 목록이 변경되었습니다. 다시 수집해 주세요.');
       }
       for (const item of page.items) rows.set(String(item.id), item);

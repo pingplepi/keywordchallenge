@@ -95,13 +95,16 @@ Deno.serve(async (request: Request) => {
       },
     });
     const page = result?.data?.participatedKeywords;
-    if (!Array.isArray(page?.items) || !Number.isInteger(page?.paging?.total)
-        || page.paging.total < 0 || page.paging.total > 200000 || page.items.length > 100) {
+    // Naver includes the total on the first page and returns null on later pages.
+    const total = page?.paging?.total;
+    const validTotal = Number.isInteger(total) && total >= 0 && total <= 200000;
+    if (!Array.isArray(page?.items) || !page?.paging || page.items.length > 100
+        || (!validTotal && !(cursor !== null && total === null))) {
       throw new CollectionError(502, '네이버의 목록 형식이 변경되어 수집할 수 없습니다.');
     }
     return json(200, {
       influencerId: id, ownerId: String(space.ownerId),
-      total: page.paging.total, items: page.items.map((row: Record<string, any>) => compact(row, space.ownerId)),
+      total, items: page.items.map((row: Record<string, any>) => compact(row, space.ownerId)),
       nextCursor: page.paging.nextCursor == null ? null : String(page.paging.nextCursor),
       collectedAt: new Date().toISOString(),
     });
