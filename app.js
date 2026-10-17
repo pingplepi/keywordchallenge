@@ -72,7 +72,7 @@ async function onSessionChanged(nextSession) {
   showView('app');
   byId('accountEmail').textContent = session.user.email || '로그인됨';
   void catalog?.setContext(session.user, profiles.get(activeId) || null);
-  void strategy?.setContext(session.user, profiles.get(activeId) || null);
+  void strategy?.setContext(session.user, profiles.get(activeId) || null, { loading: !profiles.has(activeId) });
   void searchad?.status();
   await loadProfiles(version);
 }
@@ -85,12 +85,16 @@ async function loadProfiles(version = sessionVersion) {
   if (version !== sessionVersion) return;
   if (error) {
     notify(`저장 데이터를 불러오지 못했습니다: ${error.message}`, true);
+    void strategy?.setContext(session.user, profiles.get(activeId) || null, { loadError: true });
     return;
   }
   profiles = new Map((data || []).map((row) => [String(row.influencer_id), row.payload]));
   renderTabs();
   if (profiles.size) setActive(activeId && profiles.has(activeId) ? activeId : profiles.keys().next().value);
-  else byId('dashboard').hidden = true;
+  else {
+    byId('dashboard').hidden = true;
+    void strategy?.setContext(session.user, null);
+  }
 }
 
 async function saveProfile(payload) {
@@ -98,6 +102,7 @@ async function saveProfile(payload) {
   const id = String(payload.influencerId);
   const savingUserId = session?.user.id;
   if (!savingUserId) throw new Error('로그인 후 저장해 주세요.');
+  const firstConnection = profiles.size === 0;
   const { error } = await supabase.from('keychallenge_profiles').upsert({
     user_id: savingUserId,
     influencer_id: id,
@@ -111,6 +116,7 @@ async function saveProfile(payload) {
   activeId = id;
   renderTabs();
   setActive(id);
+  if (firstConnection) window.location.replace('#strategyView');
 }
 
 function renderTabs() {

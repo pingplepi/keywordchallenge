@@ -12,8 +12,8 @@ export function createStrategy(client) {
   let user = null, profile = null, data = null, fields = [], version = 0, contextVersion = 0, detailVersion = 0, searchVersion = 0, page = 1, mover = 'up', timer;
   const records = new Map();
   $('strategyView').innerHTML = `
-    <div class="strategy-heading"><div><p class="eyebrow">YOUR DAILY KEYWORD BRIEF</p><h1>키워드 챌린지 대시보드</h1><p id="strategySubtitle" class="muted">오늘 집중할 키워드를 한눈에 확인하세요.</p></div><a class="button button-light" href="#mySpace">수집·예약 관리 ↗</a></div>
-    <div id="strategyEmpty" class="panel strategy-welcome"><h2>내 인플홈의 공략 지도를 만들어 보세요.</h2><p class="muted">로그인하고 인플홈을 한 번 수집하면, 참여 현황과 순위에 맞춰 대시보드가 채워집니다.</p><a class="button" href="#mySpace">인플홈 연결하기</a></div>
+    <div class="strategy-heading"><div><p class="eyebrow">YOUR DAILY KEYWORD BRIEF</p><h1>키워드 챌린지 대시보드</h1><p id="strategySubtitle" class="muted">오늘 집중할 키워드를 한눈에 확인하세요.</p></div><a id="strategyManageLink" class="button button-light" href="#mySpace" hidden>수집·예약 관리 ↗</a></div>
+    <div id="strategyEmpty" class="panel strategy-welcome" aria-live="polite" aria-busy="true"><h2 id="strategyWelcomeTitle">연결 정보를 불러오고 있어요.</h2><p id="strategyWelcomeDescription" class="muted">잠시만 기다려 주세요.</p><a id="strategyConnect" class="button" href="#mySpace" hidden>인플홈 연결하기</a><button id="strategyRetry" class="button" hidden>다시 불러오기</button><p id="strategyWelcomeNote" class="muted small" hidden>처음 한 번 연결하면 다음 로그인부터 내 대시보드가 바로 열립니다.</p></div>
     <div id="strategyContent" hidden>
       <div class="strategy-context"><div><span id="strategyProfile" class="profile-chip"></span><span id="strategyDate" class="muted small"></span></div><div class="strategy-controls"><label>분야<select id="strategyField"><option value="__mine__">내 주요 분야</option><option value="">모든 분야</option></select></label><button id="strategyRefresh" class="button button-quiet">새로고침</button></div></div>
       <p id="strategyError" class="message error" role="status" hidden></p>
@@ -130,6 +130,7 @@ export function createStrategy(client) {
     const metric=event.target.closest('[data-filter]');if(metric){$('detailStatus').value=metric.dataset.filter;page=1;const opened=$('strategyDetails').open;$('strategyDetails').open=true;if(opened)void search();$('strategyDetails').scrollIntoView({behavior:'smooth',block:'start'});}
   });
   $('closeKeyword').addEventListener('click',()=>$('keywordDialog').close());
+  $('strategyRetry').addEventListener('click',()=>window.location.reload());
   $('strategyRefresh').addEventListener('click',refresh);$('strategyField').addEventListener('change',refresh);
   $('strategyDetails').addEventListener('toggle',()=>{if($('strategyDetails').open)void search();});
   const debounced=()=>{clearTimeout(timer);timer=setTimeout(()=>{page=1;void search();},300);};
@@ -137,13 +138,25 @@ export function createStrategy(client) {
   for(const id of ['detailField','detailStatus','detailSort'])$(id).addEventListener('change',()=>{page=1;void search();});
   $('detailReset').addEventListener('click',()=>{for(const id of ['detailQuery',...['p','r','c','v'].flatMap(k=>[`detail${k}min`,`detail${k}max`])])$(id).value='';$('detailField').value=data?.field||'';$('detailStatus').value='all';$('detailSort').value='rank';page=1;void search();});
   $('detailPrev').addEventListener('click',()=>{if(page>1){page--;void search();}});$('detailNext').addEventListener('click',()=>{page++;void search();});
-  return {refresh,async setContext(nextUser,nextProfile){
+  return {refresh,async setContext(nextUser,nextProfile,{loading=false,loadError=false}={}){
     const context=++contextVersion;
     const changed=profile?.influencerId!==nextProfile?.influencerId||user?.id!==nextUser?.id;
     user=nextUser;profile=nextProfile;version++;searchVersion++;detailVersion++;
     $('strategyView').hidden=false;$('strategyEmpty').hidden=!!profile;$('strategyContent').hidden=!profile;
+    $('strategyManageLink').hidden=!profile;
     if($('keywordDialog').open)$('keywordDialog').close();
-    if(!profile){data=null;records.clear();return;}
+    if(!profile){
+      data=null;records.clear();
+      $('strategySubtitle').textContent=user?'인플홈을 연결하고 나만의 키워드 대시보드를 시작하세요.':'오늘 집중할 키워드를 한눈에 확인하세요.';
+      $('strategyEmpty').setAttribute('aria-busy',String(loading));
+      $('strategyConnect').hidden=loading||loadError;
+      $('strategyRetry').hidden=!loadError;
+      $('strategyWelcomeNote').hidden=loading||loadError||!user;
+      $('strategyWelcomeTitle').textContent=loading?'연결 정보를 불러오고 있어요.':loadError?'연결 정보를 불러오지 못했어요.':user?'인플홈 연결하기':'내 키워드 챌린지를 한곳에서 관리하세요.';
+      $('strategyWelcomeDescription').textContent=loading?'잠시만 기다려 주세요.':loadError?'잠시 후 다시 불러와 주세요.':user?'내 네이버 인플홈 주소를 처음 한 번만 입력해 주세요. 참여 키워드와 순위를 자동으로 불러와 대시보드를 채워 드립니다.':'로그인하거나 가입한 뒤 인플홈을 연결해 주세요.';
+      $('strategyConnect').textContent=user?'인플홈 연결하기':'로그인 · 가입하기';
+      return;
+    }
     $('strategyProfile').textContent=profile.influencerId;$('strategySubtitle').textContent='참여 현황부터 다음 공략까지, 매일 쌓이는 내 키워드 기록.';
     if(!fields.length){const {data:info,error}=await client.rpc('keychallenge_catalog_info');if(context!==contextVersion)return;if(!error)fields=info.fields||[];}
     if(changed||$('strategyField').options.length===2){const options=fields.map(f=>`<option value="${esc(f.field)}">${esc(f.field)}</option>`).join('');$('strategyField').innerHTML='<option value="__mine__">내 주요 분야</option><option value="">모든 분야</option>'+options;$('detailField').innerHTML='<option value="">모든 분야</option>'+options;records.clear();}
