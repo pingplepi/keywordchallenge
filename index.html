@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#f7f7fb" />
+    <title>키챌 대시보드</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <header class="topbar">
+        <a class="brand" href="/"><span class="brand-mark">K</span><span>키챌 대시보드</span></a>
+        <div class="account" id="accountBar" hidden>
+          <span id="accountEmail" class="muted"></span>
+          <button id="signOutButton" class="button button-quiet" type="button">로그아웃</button>
+        </div>
+      </header>
+
+      <section id="setupView" class="panel setup" hidden>
+        <p class="eyebrow">처음 한 번만 설정해 주세요</p>
+        <h1>Supabase 연결이 필요합니다</h1>
+        <p class="muted">저장소의 <code>config.example.js</code>를 참고해 Supabase 프로젝트 설정을 준비하고, Vercel에는 환경 변수 <code>SUPABASE_URL</code>과 <code>SUPABASE_ANON_KEY</code>를 등록해 주세요.</p>
+        <a class="button" href="https://supabase.com/dashboard" target="_blank" rel="noreferrer">Supabase 열기 ↗</a>
+      </section>
+
+      <section id="authView" class="auth-layout" hidden>
+        <div class="intro">
+          <p class="eyebrow">NAVER INFLUENCER · KEYCHALLENGE</p>
+          <h1>내 키워드 챌린지를<br /><span>한곳에서 관리하세요.</span></h1>
+          <p class="muted">계정을 만들면 수집한 키워드와 순위를 본인 계정에 저장할 수 있습니다. 각 계정의 데이터는 분리되어 보관됩니다.</p>
+          <div class="feature-list"><span>✓ 인플루언서별 데이터 관리</span><span>✓ 순위와 참여 현황 검색</span><span>✓ 내 데이터 백업 및 내보내기</span></div>
+        </div>
+        <form id="authForm" class="panel auth-card">
+          <div class="auth-tabs"><button type="button" class="auth-tab active" data-mode="signin">로그인</button><button type="button" class="auth-tab" data-mode="signup">계정 만들기</button></div>
+          <label>이메일<input id="emailInput" type="email" autocomplete="email" required placeholder="you@example.com" /></label>
+          <label>비밀번호<input id="passwordInput" type="password" autocomplete="current-password" minlength="8" required placeholder="8자 이상" /></label>
+          <button id="authSubmit" class="button button-wide" type="submit">로그인</button>
+          <p id="authMessage" class="message" aria-live="polite"></p>
+        </form>
+      </section>
+
+      <section id="appView" hidden>
+        <div class="page-heading">
+          <div><p class="eyebrow">내 작업 공간</p><h1>키챌 대시보드</h1><p class="muted">인플루언서 ID를 입력해 키워드와 현재 순위를 관리하세요.</p></div>
+        </div>
+        <div id="notice" class="notice" role="status" hidden></div>
+        <section class="panel collect-panel">
+          <div class="collect-form"><div class="input-grow"><label for="influencerInput">인플루언서 ID 또는 인플홈 주소</label><input id="influencerInput" placeholder="예: jiny_free_beauty 또는 in.naver.com/jiny_free_beauty" /></div><button id="collectButton" class="button" type="button">분석 / 수집 시작</button></div>
+          <div class="subtle">내 저장 데이터는 로그인한 계정에만 연결됩니다. 처음 수집할 때는 네이버 인플홈에서 수집기 코드를 직접 실행해야 합니다.</div>
+          <div id="collectorGuide" class="collector-guide" hidden>
+            <div class="guide-head"><div><strong>수집 결과 자동 전달</strong><p class="muted">아래 버튼으로 인플홈을 열고, 네이버 탭의 개발자 도구에서 복사한 수집기를 실행하세요.</p></div><span id="collectorStatus" class="status-pill">대기 중</span></div>
+            <div class="guide-actions"><button id="openNaverButton" class="button button-dark" type="button">수집기 복사 + 인플홈 열기 ↗</button><button id="copyCollectorButton" class="button button-light" type="button">수집기 다시 복사</button><span class="muted small">F12 → Sources → Snippets → 붙여넣기 → Ctrl+Enter</span></div>
+          </div>
+        </section>
+
+        <div class="toolbar"><div id="profileTabs" class="profile-tabs"></div><div class="toolbar-actions"><label class="button button-light file-button">JSON 가져오기<input id="importInput" type="file" accept="application/json,.json" multiple /></label><button id="exportButton" class="button button-light" type="button">내 데이터 내보내기</button></div></div>
+
+        <section id="dashboard" hidden>
+          <div class="stats"><article class="panel stat"><span>분석 대상</span><strong id="statId">-</strong></article><article class="panel stat"><span>참여 키워드</span><strong id="statTotal">-</strong></article><article class="panel stat"><span>TOP 3</span><strong id="statTop3">-</strong></article><article class="panel stat"><span>순위 확인</span><strong id="statRanked">-</strong></article></div>
+          <section class="panel table-panel"><div class="table-heading"><div><h2>내 키챌 현황</h2><p class="muted">현재 순위, 참여 콘텐츠, 최근 참여 날짜를 확인합니다.</p></div><div class="filters"><input id="searchInput" placeholder="키워드 검색" /><select id="rankFilter"><option value="all">전체 순위</option><option value="3">TOP 3</option><option value="10">TOP 10</option><option value="100">100위 이내</option><option value="none">순위 없음</option></select><select id="sortSelect"><option value="rank">순위순</option><option value="recent">최근 참여순</option><option value="contents">콘텐츠 많은순</option></select></div></div><div id="keywordTable" class="table-wrap"></div></section>
+        </section>
+        <footer>독립 분석 도구 · 네이버 공식 서비스가 아닙니다.</footer>
+      </section>
+    </main>
+    <script src="/config.js"></script>
+    <script type="module" src="/app.js"></script>
+  </body>
+</html>
