@@ -70,6 +70,15 @@ export function createCatalog(client) {
     $('catalogSource').textContent = metadata
       ? `${metadata.source_label} · 수집 기준 ${date(metadata.collected_at)}`
       : '관리자가 공용 키워드 목록을 등록하면 모든 사용자가 검색할 수 있습니다.';
+    const schedule = await client.from('keychallenge_refresh_schedule')
+      .select('enabled,catalog_status,catalog_last_success_at').eq('singleton', true).maybeSingle();
+    if (!schedule.error && schedule.data?.enabled) {
+      const state = schedule.data;
+      const status = ['queued','running'].includes(state.catalog_status) ? ' · 현재 갱신 중'
+        : state.catalog_status === 'retrying' ? ' · 오류 후 재시도 대기'
+        : state.catalog_status === 'failed' ? ' · 최근 갱신 실패, 이전 목록 유지' : '';
+      $('catalogSource').textContent += ` · 매일 오전 4시(한국시간)부터 자동 갱신${status}`;
+    }
     const previous = $('catalogField').value;
     $('catalogField').innerHTML = '<option value="">모든 분야</option>' + data.fields.map((f) =>
       `<option value="${escape(f.field)}">${escape(f.field)} (${number(f.count)})</option>`).join('');

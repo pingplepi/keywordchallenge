@@ -75,7 +75,7 @@
         <div id="notice" class="notice" role="status" hidden></div>
         <section class="panel collect-panel">
           <div class="collect-form"><div class="input-grow"><label for="influencerInput">인플루언서 ID 또는 인플홈 주소</label><input id="influencerInput" placeholder="본인의 in.naver.com/아이디 주소를 입력하세요" /></div><button id="collectButton" class="button" type="button">자동 수집 시작</button></div>
-          <div class="subtle">주소를 입력하면 공개된 참여 키워드와 순위를 자동으로 가져옵니다. 완료되면 내 계정에 저장됩니다. 수집 중에는 이 화면을 열어 두세요.</div>
+          <div class="subtle">처음에는 주소를 입력하고 수집해 주세요. 저장한 인플홈은 매일 오전 4시(한국시간)부터 자동 갱신됩니다. 지금 수집하는 동안에는 이 화면을 열어 두세요.</div>
           <div id="collectorGuide" class="collector-guide" hidden>
             <div class="guide-head"><div><strong>공개 데이터 자동 수집</strong><p class="muted">전체 목록을 가져온 뒤 참여 여부와 순위를 업데이트합니다.</p></div><span id="collectorStatus" class="status-pill" role="status" aria-live="polite">대기 중</span></div>
             <progress id="collectionProgress" class="collection-progress" max="1" value="0" aria-label="키워드 수집 진행률"></progress>
@@ -86,6 +86,12 @@
         <div class="toolbar"><div id="profileTabs" class="profile-tabs"></div><div class="toolbar-actions"><label class="button button-light file-button">JSON 가져오기<input id="importInput" type="file" accept="application/json,.json" multiple /></label><button id="exportButton" class="button button-light" type="button">내 데이터 내보내기</button></div></div>
 
         <section id="dashboard" hidden>
+          <section id="refreshSettings" class="panel refresh-settings" hidden>
+            <div class="refresh-heading"><div><p class="eyebrow">DAILY REFRESH</p><h2>매일 갱신되는 내 키워드</h2></div><span id="refreshBadge" class="status-pill"></span></div>
+            <label class="refresh-toggle"><input id="autoRefreshToggle" type="checkbox" />매일 오전 4시 자동 갱신</label>
+            <p class="muted small">한국시간 기준으로 참여 키워드와 순위를 순차 갱신합니다. 사이트와 컴퓨터를 꺼 두어도 실행됩니다.</p>
+            <p id="refreshNext" class="small"></p><p id="refreshLast" class="muted small"></p><p id="refreshStatus" class="message" role="status"></p>
+          </section>
           <div class="stats"><article class="panel stat"><span>분석 대상</span><strong id="statId">-</strong></article><article class="panel stat"><span>참여 키워드</span><strong id="statTotal">-</strong></article><article class="panel stat"><span>TOP 3</span><strong id="statTop3">-</strong></article><article class="panel stat"><span>순위 확인</span><strong id="statRanked">-</strong></article></div>
           <section class="panel table-panel"><div class="table-heading"><div><h2>내 키챌 현황</h2><p class="muted">현재 순위, 참여 콘텐츠, 최근 참여 날짜를 확인합니다.</p></div><div class="filters"><input id="searchInput" placeholder="키워드 검색" /><select id="rankFilter"><option value="all">전체 순위</option><option value="3">TOP 3</option><option value="10">TOP 10</option><option value="100">100위 이내</option><option value="none">순위 없음</option></select><select id="sortSelect"><option value="rank">순위순</option><option value="recent">최근 참여순</option><option value="contents">콘텐츠 많은순</option></select></div></div><div id="keywordTable" class="table-wrap"></div></section>
         </section>

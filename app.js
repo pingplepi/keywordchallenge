@@ -12,6 +12,8 @@ let activeId = '';
 let collectionController = null;
 let catalog;
 let sessionVersion = 0;
+let refreshSchedule = null;
+let refreshViewVersion = 0;
 
 function showView(name) {
   for (const [key, element] of Object.entries(views)) element.hidden = key !== name;
@@ -121,7 +123,58 @@ function setActive(id) {
   byId('dashboard').hidden = false;
   renderTabs();
   renderTable();
+  void renderRefreshSettings();
   void catalog?.setContext(session?.user || null, profiles.get(activeId));
+}
+
+const koreanTime = (value) => new Date(value).toLocaleString('ko-KR', {
+  timeZone: 'Asia/Seoul', dateStyle: 'medium', timeStyle: 'short',
+});
+
+async function loadRefreshSchedule() {
+  const { data, error } = await supabase.from('keychallenge_refresh_schedule')
+    .select('enabled,daily_hour,timezone').eq('singleton', true).single();
+  refreshSchedule = error ? null : data;
+}
+
+async function renderRefreshSettings() {
+  const version = ++refreshViewVersion;
+  const id = activeId;
+  const userId = session?.user.id;
+  byId('refreshSettings').hidden = true;
+  if (!id || !userId || !refreshSchedule) return;
+  const { data, error } = await supabase.from('keychallenge_profiles')
+    .select('auto_refresh_enabled,scheduled_status,scheduled_error,last_scheduled_at')
+    .eq('user_id', userId).eq('influencer_id', id).maybeSingle();
+  if (version !== refreshViewVersion || id !== activeId || userId !== session?.user.id || error || !data) return;
+  const enabled = refreshSchedule.enabled && data.auto_refresh_enabled;
+  byId('refreshSettings').hidden = false;
+  byId('autoRefreshToggle').checked = data.auto_refresh_enabled;
+  byId('autoRefreshToggle').disabled = !refreshSchedule.enabled;
+  byId('refreshBadge').textContent = enabled ? '예약 켜짐' : '예약 꺼짐';
+  const next = new Date();
+  next.setUTCHours(19, 0, 0, 0);
+  if (next <= new Date()) next.setUTCDate(next.getUTCDate() + 1);
+  byId('refreshNext').textContent = enabled ? `다음 예약 · ${koreanTime(next)}부터` : '예약 수집이 꺼져 있습니다. 위 버튼으로 직접 수집할 수 있습니다.';
+  const last = profiles.get(id)?.collectedAt;
+  byId('refreshLast').textContent = `${last ? `현재 데이터 · ${koreanTime(last)}` : ''}${data.last_scheduled_at ? ` · 최근 예약 완료 ${koreanTime(data.last_scheduled_at)}` : ''}`;
+  const labels = { waiting: '다음 예약 시간에 자동 갱신합니다.', queued: '예약 수집 대기 중입니다.', running: '서버에서 수집 중입니다. 화면을 닫아도 계속 진행됩니다.', succeeded: '예약 수집을 완료했습니다.', retrying: '일시적인 오류로 잠시 후 다시 시도합니다. 기존 데이터는 유지됩니다.', failed: '이번 예약 수집을 완료하지 못했습니다. 기존 데이터를 유지하고 다음 예약에 다시 시도합니다.', skipped: '최근 직접 수집한 데이터 또는 변경한 예약 설정을 유지했습니다.' };
+  byId('refreshStatus').textContent = enabled ? (labels[data.scheduled_status] || '') : '';
+  byId('refreshStatus').className = `message ${data.scheduled_status === 'failed' ? 'error' : ''}`;
+}
+
+async function toggleAutoRefresh() {
+  const userId = session?.user.id;
+  const id = activeId;
+  if (!userId || !id) return;
+  const enabled = byId('autoRefreshToggle').checked;
+  byId('autoRefreshToggle').disabled = true;
+  const { error } = await supabase.from('keychallenge_profiles').update({ auto_refresh_enabled: enabled })
+    .eq('user_id', userId).eq('influencer_id', id);
+  if (userId !== session?.user.id) return;
+  if (error) notify('예약 설정을 저장하지 못했습니다. 잠시 후 다시 시도해 주세요.', true);
+  else notify(`${id}의 매일 자동 갱신을 ${enabled ? '켰습니다' : '껐습니다'}.`);
+  await renderRefreshSettings();
 }
 
 function rankIsValid(value) { return value !== null && value !== '' && Number.isFinite(Number(value)) && Number(value) > 0; }
@@ -343,6 +396,7 @@ async function initialize() {
   });
   catalog = createCatalog(supabase);
   void catalog.initialize();
+  await loadRefreshSchedule();
   const { data: { session: currentSession }, error } = await supabase.auth.getSession();
   if (error) notify(error.message, true);
   await onSessionChanged(currentSession);
@@ -360,6 +414,7 @@ byId('signOutButton').addEventListener('click', async () => {
 });
 byId('collectButton').addEventListener('click', startCollection);
 byId('cancelCollectionButton').addEventListener('click', () => collectionController?.abort());
+byId('autoRefreshToggle').addEventListener('change', toggleAutoRefresh);
 byId('exportButton').addEventListener('click', exportBackup);
 byId('importInput').addEventListener('change', importFiles);
 for (const id of ['searchInput', 'rankFilter', 'sortSelect']) byId(id).addEventListener('input', renderTable);
