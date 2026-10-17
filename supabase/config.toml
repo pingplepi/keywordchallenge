@@ -1,2 +1,5 @@
 [functions.keychallenge-handoff]
 verify_jwt = false
+
+[functions.keychallenge-collect]
+verify_jwt = true

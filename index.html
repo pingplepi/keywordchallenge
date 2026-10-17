@@ -74,11 +74,12 @@
         </div>
         <div id="notice" class="notice" role="status" hidden></div>
         <section class="panel collect-panel">
-          <div class="collect-form"><div class="input-grow"><label for="influencerInput">인플루언서 ID 또는 인플홈 주소</label><input id="influencerInput" placeholder="본인의 in.naver.com/아이디 주소를 입력하세요" /></div><button id="collectButton" class="button" type="button">분석 / 수집 시작</button></div>
-          <div class="subtle">내 저장 데이터는 로그인한 계정에만 연결됩니다. 처음 수집할 때는 네이버 인플홈에서 수집기 코드를 직접 실행해야 합니다.</div>
+          <div class="collect-form"><div class="input-grow"><label for="influencerInput">인플루언서 ID 또는 인플홈 주소</label><input id="influencerInput" placeholder="본인의 in.naver.com/아이디 주소를 입력하세요" /></div><button id="collectButton" class="button" type="button">자동 수집 시작</button></div>
+          <div class="subtle">주소를 입력하면 공개된 참여 키워드와 순위를 자동으로 가져옵니다. 완료되면 내 계정에 저장됩니다. 수집 중에는 이 화면을 열어 두세요.</div>
           <div id="collectorGuide" class="collector-guide" hidden>
-            <div class="guide-head"><div><strong>수집 결과 자동 전달</strong><p class="muted">아래 버튼으로 인플홈을 열고, 네이버 탭의 개발자 도구에서 복사한 수집기를 실행하세요.</p></div><span id="collectorStatus" class="status-pill">대기 중</span></div>
-            <div class="guide-actions"><button id="openNaverButton" class="button button-dark" type="button">수집기 복사 + 인플홈 열기 ↗</button><button id="copyCollectorButton" class="button button-light" type="button">수집기 다시 복사</button><span class="muted small">F12 → Sources → Snippets → 붙여넣기 → Ctrl+Enter</span></div>
+            <div class="guide-head"><div><strong>공개 데이터 자동 수집</strong><p class="muted">전체 목록을 가져온 뒤 참여 여부와 순위를 업데이트합니다.</p></div><span id="collectorStatus" class="status-pill" role="status" aria-live="polite">대기 중</span></div>
+            <progress id="collectionProgress" class="collection-progress" max="1" value="0" aria-label="키워드 수집 진행률"></progress>
+            <div class="collection-progress-row"><p id="collectionProgressText" class="muted" aria-live="polite"></p><button id="cancelCollectionButton" class="button button-light" type="button" hidden>수집 취소</button></div>
           </div>
         </section>
 
