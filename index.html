@@ -4,8 +4,8 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="theme-color" content="#f7f7fb" />
-    <title>키워드 챌린지 대시보드 · 모든 분야 키워드 탐색</title>
-    <meta name="description" content="일반 블로거의 키워드 탐색과 블로그 분석, 네이버 인플루언서의 키워드 챌린지 현황을 한곳에서 관리하세요." />
+    <title>키온 대시보드 · key:on</title>
+    <meta name="description" content="키온(key:on)에서 키워드 탐색과 블로그 분석, 네이버 인플루언서의 키워드 챌린지 현황을 한곳에서 관리하세요." />
     <link rel="stylesheet" href="/styles.css" />
     <link rel="stylesheet" href="/blogger.css" />
     <link rel="stylesheet" href="/membership.css" />
@@ -14,13 +14,13 @@
   <body>
     <main class="shell">
       <header class="topbar">
-        <a class="brand" href="/"><span class="brand-mark">K</span><span>키워드 챌린지 대시보드</span></a>
+        <a class="brand" href="/" aria-label="키온(key:on) 대시보드 홈"><span class="brand-wordmark" aria-hidden="true">key<span class="brand-colon">:</span><span class="brand-on">on</span></span><span class="brand-title">키온 대시보드</span></a>
         <div class="account" id="accountBar" hidden>
           <span id="adminBadge" class="status-pill" hidden>관리자</span><span id="accountEmail" class="muted"></span><a id="membershipBadge" class="status-pill membership-badge" href="#membershipView" hidden>이용 등급</a>
           <button id="signOutButton" class="button button-quiet" type="button">로그아웃</button>
         </div>
       </header>
-      <nav class="section-nav" aria-label="대시보드 메뉴"><a href="#strategyView">대시보드</a><a href="#keywordSearchView">키워드 검색</a><a href="#savedKeywordsView">보관함</a><a href="#blogAnalysisView">내 블로그 분석</a><a href="#catalogView">전체 키챌 목록</a><a id="collectionNav" href="#mySpace" hidden>수집·예약 관리</a><a href="#accountView">내 설정</a><a id="memberAdminNav" href="#memberAdmin" hidden>회원 관리</a><a id="adminNav" href="#catalogAdmin" hidden>관리자 설정</a></nav>
+      <nav class="section-nav" aria-label="대시보드 메뉴"><a href="#strategyView">대시보드</a><a href="#blogAnalysisView">내 블로그 분석</a><a href="#keywordSearchView">키워드 검색</a><a href="#savedKeywordsView">보관함</a><a href="#catalogView">전체 키챌 목록</a><a id="collectionNav" href="#mySpace" hidden>수집·예약 관리</a><a href="#accountView">내 설정</a><a id="memberAdminNav" href="#memberAdmin" hidden>회원 관리</a><a id="adminNav" href="#catalogAdmin" hidden>관리자 설정</a></nav>
       <section id="memberAdmin" hidden aria-label="회원 관리"></section>
       <section id="membershipView" hidden aria-label="내 이용 등급"></section>
       <section id="accountView" hidden aria-label="내 작업 공간 설정"></section>
@@ -29,7 +29,7 @@
       <section id="blogAnalysisView" hidden aria-label="내 블로그 분석"></section>
       <div id="workspaceToast" class="workspace-toast" role="status" aria-live="polite" hidden></div>
 
-      <section id="strategyView" hidden aria-label="키워드 챌린지 대시보드"></section>
+      <section id="strategyView" hidden aria-label="키온 대시보드"></section>
 
       <section id="catalogView" hidden aria-labelledby="catalogTitle">
         <div class="catalog-hero"><div><p class="eyebrow">ALL FIELDS · KEYWORD EXPLORER</p><h1 id="catalogTitle">다음 키워드를<br /><span>발견하는 곳.</span></h1><p class="muted">여행부터 뷰티, 푸드, 테크까지.<br />아직 참여하지 않은 키워드도 한곳에서 찾아보세요.</p></div><div class="catalog-summary panel"><span id="catalogCoverage" class="status-pill">목록 준비 중</span><strong><span id="catalogTotal">—</span><small>개 키워드</small></strong><div><span id="catalogFieldCount">—</span>개 분야 · 로그인 없이 검색</div><p id="catalogDate" class="muted">불러오는 중</p></div></div>
@@ -119,7 +119,7 @@
     <footer class="site-footer">
       <div class="shell">
         <div class="footer-line">
-          <a class="footer-service" href="/">키워드 챌린지 대시보드</a>
+          <a class="footer-service" href="/">키온 <span class="footer-wordmark">key<span class="brand-colon">:</span><span class="brand-on">on</span></span></a>
           <p class="footer-note">© 2026 뷰티지니 그리고 핑플피. All rights reserved.</p>
           <div class="footer-creators"><span>만든이</span><a href="https://blog.naver.com/free_beauty_" target="_blank" rel="noopener noreferrer" aria-label="뷰티지니 블로그 (새 창)">뷰티지니 · 블로그 ↗</a><span>그리고</span><a href="https://blog.naver.com/pingplepi" target="_blank" rel="noopener noreferrer" aria-label="핑플피 블로그 (새 창)">핑플피 · 블로그 ↗</a></div>
         </div>

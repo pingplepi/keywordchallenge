@@ -12,7 +12,7 @@ export function createStrategy(client) {
   let user = null, profile = null, data = null, fields = [], version = 0, contextVersion = 0, detailVersion = 0, searchVersion = 0, page = 1, mover = 'up', timer;
   const records = new Map();
   $('strategyView').innerHTML = `
-    <div class="strategy-heading"><div><p class="eyebrow">YOUR DAILY KEYWORD BRIEF</p><h1>키워드 챌린지 대시보드</h1><p id="strategySubtitle" class="muted">오늘 집중할 키워드를 한눈에 확인하세요.</p></div><a id="strategyManageLink" class="button button-light" href="#mySpace" hidden>수집·예약 관리 ↗</a></div>
+    <div class="strategy-heading"><div><p class="eyebrow">YOUR DAILY KEYWORD BRIEF</p><h1>키온 대시보드</h1><p id="strategySubtitle" class="muted">오늘 집중할 키워드를 한눈에 확인하세요.</p></div><a id="strategyManageLink" class="button button-light" href="#mySpace" hidden>수집·예약 관리 ↗</a></div>
     <div id="strategyEmpty" class="panel strategy-welcome" aria-live="polite" aria-busy="true"><h2 id="strategyWelcomeTitle">연결 정보를 불러오고 있어요.</h2><p id="strategyWelcomeDescription" class="muted">잠시만 기다려 주세요.</p><a id="strategyConnect" class="button" href="#mySpace" hidden>인플홈 연결하기</a><button id="strategyRetry" class="button" hidden>다시 불러오기</button><p id="strategyWelcomeNote" class="muted small" hidden>처음 한 번 연결하면 다음 로그인부터 내 대시보드가 바로 열립니다.</p></div>
     <div id="strategyContent" hidden>
       <div class="strategy-context"><div><span id="strategyProfile" class="profile-chip"></span><span id="strategyDate" class="muted small"></span></div><div class="strategy-controls"><label>분야<select id="strategyField"><option value="__mine__">내 주요 분야</option><option value="">모든 분야</option></select></label><button id="strategyRefresh" class="button button-quiet">새로고침</button></div></div>
