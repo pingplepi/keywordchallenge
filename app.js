@@ -11,6 +11,7 @@ const views = { setup: byId('setupView'), auth: byId('authView'), app: byId('app
 let supabase;
 let session = null;
 let authMode = 'signin';
+let authBusy = false;
 let profiles = new Map();
 let activeId = '';
 let collectionController = null;
@@ -43,6 +44,29 @@ function setAuthMessage(message, kind = '') {
   const node = byId('authMessage');
   node.textContent = message;
   node.className = `message ${kind}`;
+  byId('authExistingActions').hidden = true;
+  byId('authRecoveryLink').hidden = false;
+}
+
+function showExistingAccount() {
+  setAuthMessage('이미 가입된 이메일입니다. 로그인하거나 비밀번호를 재설정해 주세요.', 'error');
+  byId('authExistingActions').hidden = false;
+  byId('authRecoveryLink').hidden = true;
+}
+
+function isDuplicateSignup(data, error) {
+  if (error) return ['user_already_exists', 'email_exists'].includes(error.code)
+    || /^(user already registered|email already (?:registered|exists))\.?$/i.test(error.message || '');
+  // Supabase may return HTTP 200 with a sanitized user for a repeated signup.
+  // Only an explicit empty identities array counts; missing data is not a duplicate signal.
+  return !data?.session && Boolean(data?.user) && Array.isArray(data.user.identities)
+    && data.user.identities.length === 0;
+}
+
+function setAuthBusy(busy) {
+  authBusy = busy;
+  byId('authForm').setAttribute('aria-busy', String(busy));
+  byId('authForm').querySelectorAll('input, button').forEach(control => { control.disabled = busy; });
 }
 
 function normalizeId(value) {
@@ -387,6 +411,7 @@ async function importFiles(event) {
 }
 
 function setAuthMode(mode) {
+  if (authBusy) return;
   authMode = mode;
   document.querySelectorAll('.auth-tab').forEach((tab) => tab.classList.toggle('active', tab.dataset.mode === mode));
   byId('authSubmit').textContent = mode === 'signin' ? '로그인' : '계정 만들기';
@@ -396,27 +421,39 @@ function setAuthMode(mode) {
 
 async function handleAuthSubmit(event) {
   event.preventDefault();
+  if (authBusy) return;
+  const mode = authMode;
   const email = byId('emailInput').value.trim();
   const password = byId('passwordInput').value;
-  byId('authSubmit').disabled = true;
-  setAuthMessage(authMode === 'signin' ? '로그인 중…' : '계정을 만드는 중…');
+  setAuthBusy(true);
+  setAuthMessage(mode === 'signin' ? '로그인 중…' : '가입 요청을 처리하는 중…');
   try {
-    if (authMode === 'signin') {
+    if (mode === 'signin') {
       const { error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) throw error;
       setAuthMessage('로그인했습니다.', 'success');
       window.location.replace('#strategyView');
     } else {
       const { data, error } = await supabase.auth.signUp({ email, password, options: { emailRedirectTo: window.location.origin } });
+      if (isDuplicateSignup(data, error)) {
+        showExistingAccount();
+        return;
+      }
       if (error) throw error;
-      if (data.session) {
+      if (data?.session) {
         setAuthMessage('계정이 만들어졌습니다.', 'success');
         window.location.replace('#strategyView');
       }
-      else setAuthMessage('계정이 만들어졌습니다. 이메일 인증을 완료한 뒤 로그인해 주세요.', 'success');
+      else if (data?.user && Array.isArray(data.user.identities) && data.user.identities.length > 0) {
+        setAuthMessage('이메일 인증 후 가입이 완료됩니다. 받은 메일의 인증 링크를 누른 뒤 로그인해 주세요. 메일이 보이지 않으면 스팸함도 확인해 주세요.');
+      } else {
+        setAuthMessage('가입 완료 여부를 확인하지 못했습니다. 이미 가입하셨다면 로그인하거나 비밀번호를 재설정해 주세요.', 'error');
+        byId('authExistingActions').hidden = false;
+        byId('authRecoveryLink').hidden = true;
+      }
     }
   } catch (error) { setAuthMessage(error.message, 'error'); }
-  finally { byId('authSubmit').disabled = false; }
+  finally { setAuthBusy(false); }
 }
 
 async function initialize() {
@@ -449,6 +486,12 @@ async function initialize() {
 
 document.querySelectorAll('.auth-tab').forEach((tab) => tab.addEventListener('click', () => setAuthMode(tab.dataset.mode)));
 byId('authForm').addEventListener('submit', handleAuthSubmit);
+byId('authExistingSignIn').addEventListener('click', () => {
+  setAuthMode('signin');
+  byId('passwordInput').value = '';
+  byId('passwordInput').focus();
+});
+byId('emailInput').addEventListener('input', () => { if (!authBusy) setAuthMessage(''); });
 byId('signOutButton').addEventListener('click', async () => {
   collectionController?.abort();
   const { error } = await supabase.auth.signOut();

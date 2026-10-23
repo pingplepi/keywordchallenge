@@ -182,3 +182,5 @@ label, .work-filters label, .detail-filters label, .catalog-filters label,
   .work-two-columns { gap: var(--card-gap); }
   .work-form-columns, .member-filter { row-gap: var(--inner-gap); }
 }
+.auth-existing-actions { display:flex; gap:var(--action-gap); flex-wrap:wrap; margin-top:16px; }
+.auth-existing-actions > .button { flex:1 1 140px; }
