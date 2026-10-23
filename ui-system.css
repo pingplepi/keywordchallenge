@@ -115,10 +115,15 @@ label, .work-filters label, .detail-filters label, .catalog-filters label,
 .range-filters input { font-size: var(--font-body); }
 .tbl td, .strategy-table td { font-size: var(--font-label); line-height: 1.7; }
 .tbl th, .strategy-table th { font-size: var(--font-caption); line-height: 1.7; }
+.strategy-table .reason { font-size: var(--font-caption); }
 .analysis-note, .analysis-budget { padding: var(--inner-gap); font-size: var(--font-label); line-height: 1.7; }
 .analysis-note { margin-bottom: var(--card-gap); }
 .work-filters, .detail-filters, .catalog-filters, .member-filter,
 .admin-fields, .work-form-columns, .member-edit-grid { gap: var(--inner-gap); }
+.admin-fields, .detail-filters, .work-form-columns, .member-edit-grid { margin-bottom: var(--inner-gap); }
+.admin-fields > label, .detail-filters > label, .work-form-columns > label,
+.member-edit-grid > label { margin-bottom: 0; }
+.member-edit-grid > .work-form-columns { margin-bottom: 0; }
 
 /* Page-specific structures share the same title and card rhythm. */
 .catalog-summary { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 24px; }
