@@ -49,6 +49,7 @@ function errorText(error, saving = false) {
   if (code === 'over_email_send_rate_limit' || code === 'over_request_rate_limit' || error?.status === 429) return '요청이 많아 잠시 기다려야 합니다. 잠시 후 다시 시도해 주세요.';
   if (code === 'email_address_invalid') return '이메일 주소를 확인해 주세요.';
   if (['email_address_not_authorized', 'email_address_not_allowed', 'email_provider_disabled'].includes(code)) return '현재 이 주소로 메일을 발송할 수 없습니다. 운영자에게 메일 발송 설정 확인을 요청해 주세요.';
+  if (error?.status >= 500) return saving ? '서버 오류로 비밀번호를 저장하지 못했습니다. 잠시 후 다시 시도해 주세요.' : '메일을 발송하지 못했습니다. 운영자에게 메일 연결 설정 확인을 요청해 주세요.';
   if (error?.name === 'AuthRetryableFetchError' || error instanceof TypeError) return '인터넷 연결을 확인한 뒤 다시 시도해 주세요.';
   return saving ? '비밀번호를 저장하지 못했습니다. 잠시 후 다시 시도해 주세요.' : '메일 발송 요청을 처리하지 못했습니다. 잠시 후 다시 시도해 주세요. 계속되면 운영자에게 문의해 주세요.';
 }
