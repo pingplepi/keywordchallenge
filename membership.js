@@ -8,7 +8,7 @@ const states = {basic:'기본 이용 중',active:'플러스 이용 중',schedule
 const fields = [
   ['daily_search','하루 새 검색량 조회','회','한국시간 자정 초기화 · 저장된 검색 결과 조회 제외'],
   ['saved_keywords','보관 키워드','개','현재 보관 중인 키워드 · 보관 해제 제외'],
-  ['publishing_plans','발행 계획','개','현재 등록된 계획 · 숨긴 일정 제외'],
+  ['publishing_plans','이전 발행 계획 기록','개','교체 전 저장된 기록 · 새 계획은 만들지 않습니다'],
   ['influencer_profiles','연결 인플홈','개','계정에 연결한 인플홈 수'],
 ];
 const empty = text => `<div class="work-empty">${esc(text)}</div>`;

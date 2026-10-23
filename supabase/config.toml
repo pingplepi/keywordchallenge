@@ -13,3 +13,10 @@ verify_jwt = true
 
 [functions.keychallenge-keyword-search]
 verify_jwt = true
+
+# Authenticated internally using the scheduler token held in Vault.
+[functions.keychallenge-blog-sync]
+verify_jwt = false
+
+[functions.keychallenge-blog-search]
+verify_jwt = true

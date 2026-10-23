@@ -5,10 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="theme-color" content="#f7f7fb" />
     <title>키워드 챌린지 대시보드 · 모든 분야 키워드 탐색</title>
-    <meta name="description" content="일반 블로거의 키워드 탐색과 발행 계획, 네이버 인플루언서의 키워드 챌린지 현황을 한곳에서 관리하세요." />
+    <meta name="description" content="일반 블로거의 키워드 탐색과 블로그 분석, 네이버 인플루언서의 키워드 챌린지 현황을 한곳에서 관리하세요." />
     <link rel="stylesheet" href="/styles.css" />
     <link rel="stylesheet" href="/blogger.css" />
     <link rel="stylesheet" href="/membership.css" />
+    <link rel="stylesheet" href="/blog-analysis.css" />
   </head>
   <body>
     <main class="shell">
@@ -19,14 +20,13 @@
           <button id="signOutButton" class="button button-quiet" type="button">로그아웃</button>
         </div>
       </header>
-      <nav class="section-nav" aria-label="대시보드 메뉴"><a href="#strategyView">대시보드</a><a href="#keywordSearchView">키워드 검색</a><a href="#savedKeywordsView">보관함</a><a href="#plannerView">발행 계획</a><a href="#catalogView">전체 키챌 목록</a><a id="collectionNav" href="#mySpace" hidden>수집·예약 관리</a><a href="#accountView">내 설정</a><a id="memberAdminNav" href="#memberAdmin" hidden>회원 관리</a><a id="adminNav" href="#catalogAdmin" hidden>관리자 설정</a></nav>
+      <nav class="section-nav" aria-label="대시보드 메뉴"><a href="#strategyView">대시보드</a><a href="#keywordSearchView">키워드 검색</a><a href="#savedKeywordsView">보관함</a><a href="#blogAnalysisView">내 블로그 분석</a><a href="#catalogView">전체 키챌 목록</a><a id="collectionNav" href="#mySpace" hidden>수집·예약 관리</a><a href="#accountView">내 설정</a><a id="memberAdminNav" href="#memberAdmin" hidden>회원 관리</a><a id="adminNav" href="#catalogAdmin" hidden>관리자 설정</a></nav>
       <section id="memberAdmin" hidden aria-label="회원 관리"></section>
       <section id="membershipView" hidden aria-label="내 이용 등급"></section>
       <section id="accountView" hidden aria-label="내 작업 공간 설정"></section>
-      <section id="bloggerView" hidden aria-label="블로그 대시보드"></section>
       <section id="keywordSearchView" hidden aria-label="키워드 검색"></section>
       <section id="savedKeywordsView" hidden aria-label="내 키워드 보관함"></section>
-      <section id="plannerView" hidden aria-label="발행 계획표"></section>
+      <section id="blogAnalysisView" hidden aria-label="내 블로그 분석"></section>
       <div id="workspaceToast" class="workspace-toast" role="status" aria-live="polite" hidden></div>
 
       <section id="strategyView" hidden aria-label="키워드 챌린지 대시보드"></section>
@@ -75,8 +75,8 @@
         <div class="intro">
           <p class="eyebrow">BLOG &amp; INFLUENCER · KEYWORDS</p>
           <h1>다음 글의 시작부터<br /><span>성장하는 블로그까지.</span></h1>
-          <p class="muted">일반 블로거는 키워드 검색과 글감 보관, 발행 계획을. 인플루언서는 키워드 챌린지 참여 현황과 순위까지. 가입 후 나에게 맞는 대시보드를 선택하세요. 네이버 계정과는 별도의 사이트 계정입니다.</p>
-          <div class="feature-list"><span>✓ 검색량을 비교하며 글감 찾기</span><span>✓ 내 보관함과 발행 계획 관리</span><span>✓ 인플루언서 참여 현황과 순위</span></div>
+          <p class="muted">일반 블로거는 키워드 탐색과 내 블로그 분석을, 인플루언서는 키워드 챌린지 참여 현황과 순위까지 이용하세요. 가입 후 나에게 맞는 대시보드를 선택할 수 있습니다. 네이버 계정과는 별도의 사이트 계정입니다.</p>
+          <div class="feature-list"><span>✓ 검색량을 비교하며 글감 찾기</span><span>✓ 최근 글 자동 수집과 검색 노출 점검</span><span>✓ 인플루언서 참여 현황과 순위</span></div>
         </div>
         <form id="authForm" class="panel auth-card">
           <div class="auth-tabs"><button type="button" class="auth-tab active" data-mode="signin">로그인</button><button type="button" class="auth-tab" data-mode="signup">계정 만들기</button></div>
