@@ -66,7 +66,7 @@ export async function searchBlog(credentials: SearchCredentials, query: string) 
   url.search = new URLSearchParams({query,display:'100',start:'1',sort:'sim',format:'json'}).toString();
   let response: Response;
   try { response = await fetch(url, {redirect:'error', signal:AbortSignal.timeout(10000), headers:{'X-NCP-APIGW-API-KEY-ID':credentials.clientId,'X-NCP-APIGW-API-KEY':credentials.clientSecret}}); }
-  catch { throw new BlogError('검색 서비스에 연결하지 못했습니다. 다음 갱신 때 다시 확인합니다.'); }
+  catch { throw new BlogError('검색 서비스에 연결하지 못했습니다. 다음 점검 때 다시 확인해 주세요.'); }
   if (!response.ok) {
     await response.body?.cancel();
     if (response.status===429) throw new SearchStoppedError('provider_quota');
@@ -74,7 +74,7 @@ export async function searchBlog(credentials: SearchCredentials, query: string) 
     throw new BlogError('검색 서비스가 일시적으로 응답하지 않습니다.');
   }
   let result;
-  try { result = JSON.parse(await readBounded(response)); } catch { throw new BlogError('검색 응답을 읽지 못했습니다. 다음 갱신 때 다시 확인합니다.'); }
+  try { result = JSON.parse(await readBounded(response)); } catch { throw new BlogError('검색 응답을 읽지 못했습니다. 다음 점검 때 다시 확인해 주세요.'); }
   if (!Array.isArray(result.items) || result.items.some((item: any) => typeof item.link !== 'string')) throw new BlogError('검색 응답 형식이 변경되어 확인하지 못했습니다.');
   return result.items.slice(0,100);
 }

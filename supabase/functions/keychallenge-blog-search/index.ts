@@ -24,7 +24,7 @@ Deno.serve(async req=>{
   }
   const credentials={clientId:String(body.clientId||'').trim(),clientSecret:String(body.clientSecret||'').trim()};
   if(!/^[A-Za-z0-9_-]{1,256}$/.test(credentials.clientId)||!/^[A-Za-z0-9_-]{1,256}$/.test(credentials.clientSecret))return reply(400,{error:'Client ID와 Client Secret을 확인해 주세요.'});
-  // Saving does not make an unmetered validation request. The guarded worker checks the connection.
+  // Saving does not call Naver or enqueue checks. Members request checks explicitly.
   const {error}=await db.rpc('keychallenge_blog_credentials',{p_value:{...credentials,provider:'naver_api_hub',freePolicyConfirmed:true}});if(error)throw error;
   return reply(200,{saved:true,enabled:true});
  }catch{return reply(503,{error:'검색 API 설정을 처리하지 못했습니다. 잠시 후 다시 시도해 주세요.'});}
