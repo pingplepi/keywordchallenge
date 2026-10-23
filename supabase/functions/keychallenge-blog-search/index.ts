@@ -10,13 +10,15 @@ Deno.serve(async req=>{
  try{
   const {data:auth,error:authError}=await db.auth.getUser(token);
   if(authError||!auth.user)return reply(401,{error:'다시 로그인해 주세요.'});
-  const {data:admin,error:roleError}=await db.from('keychallenge_admins').select('user_id').eq('user_id',auth.user.id).maybeSingle();
-  if(roleError||!admin)return reply(403,{error:'관리자만 검색 API를 연결할 수 있습니다.'});
+  const {data:admin,error:roleError}=await db.from('keychallenge_admins').select('user_id,can_manage_api').eq('user_id',auth.user.id).maybeSingle();
+  if(roleError||!admin)return reply(403,{error:'관리자만 API 사용 현황을 확인할 수 있습니다.'});
   const raw=await req.text();if(raw.length>2000)return reply(400,{error:'입력 길이를 확인해 주세요.'});
   let body;try{body=JSON.parse(raw);}catch{return reply(400,{error:'입력 형식을 확인해 주세요.'});}
   if(!body||typeof body!=='object'||Array.isArray(body))return reply(400,{error:'입력 형식을 확인해 주세요.'});
   const action=body.action||'save';
   if(!['status','save','pause','confirm'].includes(action))return reply(400,{error:'지원하지 않는 설정입니다.'});
+  // Usage is visible to every admin; every mutation requires API ownership.
+  if(action!=='status'&&admin.can_manage_api!==true)return reply(403,{error:'API 연결 설정을 변경할 권한이 없습니다. API 사용 현황만 조회할 수 있습니다.'});
   if(['save','confirm'].includes(action)&&body.freePolicyConfirmed!==true)return reply(400,{error:'무료 제공 정책과 네이버 콘솔의 호출 한도를 확인해 주세요.'});
   if(action!=='save'){
    const {data,error}=await db.rpc('keychallenge_blog_search_budget',{p_action:action});if(error)throw error;

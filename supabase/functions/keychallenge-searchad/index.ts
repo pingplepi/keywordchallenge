@@ -12,8 +12,8 @@ Deno.serve(async request => {
   try {
     const { data: auth, error: authError } = await db.auth.getUser(token);
     if (authError || !auth.user) return reply(401, { error: '다시 로그인해 주세요.' });
-    const { data: admin, error: roleError } = await db.from('keychallenge_admins').select('user_id').eq('user_id', auth.user.id).maybeSingle();
-    if (roleError || !admin) return reply(403, { error: '관리자만 연결할 수 있습니다.' });
+    const { data: admin, error: roleError } = await db.from('keychallenge_admins').select('user_id,can_manage_api').eq('user_id', auth.user.id).maybeSingle();
+    if (roleError || admin?.can_manage_api !== true) return reply(403, { error: '검색광고 API 연결 설정을 변경할 권한이 없습니다.' });
     const raw = await request.text();
     if (raw.length > 5000) return reply(400, { error: '입력 길이를 확인해 주세요.' });
     let body;

@@ -165,18 +165,29 @@ export function createStrategy(client) {
 }
 
 export function connectSearchAd(client,onSaved) {
+  let user=null,canManageApi=false,version=0;
   async function status(){
+    const v=++version,uid=user?.id;
+    canManageApi=false;$('searchadSettings').hidden=true;
+    if(!uid)return;
+    const {data:role,error:roleError}=await client.from('keychallenge_admins').select('can_manage_api').eq('user_id',uid).maybeSingle();
+    if(v!==version||user?.id!==uid)return;
+    if(roleError||role?.can_manage_api!==true)return;
+    canManageApi=true;$('searchadSettings').hidden=false;
     const {data,error}=await client.from('keychallenge_searchad_status').select('configured,enabled,last_success_at,last_error').eq('singleton',true).maybeSingle();
-    if(error||!data)return;
+    if(v!==version||user?.id!==uid||error||!data)return;
     $('searchadState').textContent=data.configured?(data.enabled?'연결됨 · 검색량 자동 수집 켜짐':'연결됨 · 검색량 수집 일시 중지'):'검색광고 연결 대기';
     $('searchadPause').hidden=!data.enabled;
     $('searchadStatus').textContent=data.last_error|| (data.last_success_at?`최근 검색량 수집 · ${date(data.last_success_at)}`:'운영자 계정으로 한 번 연결하면 모든 사용자가 검색량을 볼 수 있습니다.');
   }
-  async function call(body){const {data:{session}}=await client.auth.getSession();if(!session)throw new Error('다시 로그인해 주세요.');const r=await fetch(`${window.APP_CONFIG.SUPABASE_URL}/functions/v1/keychallenge-searchad`,{method:'POST',headers:{apikey:window.APP_CONFIG.SUPABASE_ANON_KEY,Authorization:`Bearer ${session.access_token}`,'Content-Type':'application/json'},body:JSON.stringify(body)});const result=await r.json();if(!r.ok)throw new Error(result.error||'연결을 저장하지 못했습니다.');return result;}
+  async function call(body){const uid=user?.id;if(!uid||!canManageApi)throw new Error('API 연결 설정을 변경할 권한이 없습니다.');const {data:{session}}=await client.auth.getSession();if(!session||session.user.id!==uid||user?.id!==uid)throw new Error('다시 로그인해 주세요.');const r=await fetch(`${window.APP_CONFIG.SUPABASE_URL}/functions/v1/keychallenge-searchad`,{method:'POST',headers:{apikey:window.APP_CONFIG.SUPABASE_ANON_KEY,Authorization:`Bearer ${session.access_token}`,'Content-Type':'application/json'},body:JSON.stringify(body)});const result=await r.json();if(!r.ok)throw new Error(result.error||'연결을 저장하지 못했습니다.');return result;}
   $('searchadForm').addEventListener('submit',async event=>{event.preventDefault();$('searchadSave').disabled=true;$('searchadStatus').textContent='검색광고 연결과 실제 검색량을 확인하고 있습니다…';try{
     const result=await call({customerId:$('searchadCustomer').value,apiKey:$('searchadApi').value,secretKey:$('searchadSecret').value});
     $('searchadApi').value='';$('searchadSecret').value='';await status();$('searchadStatus').textContent=`연결을 저장했습니다. ${num(result.measured)}개 결과를 반영했고, 나머지는 서버에서 순차 수집합니다.`;void onSaved();
   }catch(error){$('searchadStatus').textContent=error.message;}finally{$('searchadSave').disabled=false;}});
   $('searchadPause').addEventListener('click',async()=>{try{await call({action:'pause'});await status();}catch(error){$('searchadStatus').textContent=error.message;}});
-  return {status};
+  return {status,setUser(next){
+    if(user?.id!==next?.id){version++;canManageApi=false;$('searchadSettings').hidden=true;$('searchadForm').reset();$('searchadStatus').textContent='';}
+    user=next;if(user)void status();
+  }};
 }

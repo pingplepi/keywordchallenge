@@ -63,6 +63,7 @@ async function onSessionChanged(nextSession) {
   const changedUser = session?.user.id !== nextSession?.user.id;
   session = nextSession;
   blogAnalysis?.setUser(session?.user || null);
+  searchad?.setUser(session?.user || null);
   void membership?.setUser(session?.user || null);
   if (changedUser) { member = null; memberReady = false; }
   showPage();
@@ -87,7 +88,6 @@ async function onSessionChanged(nextSession) {
   byId('accountEmail').textContent = session.user.email || '로그인됨';
   void catalog?.setContext(session.user, profiles.get(activeId) || null);
   void strategy?.setContext(session.user, profiles.get(activeId) || null, { loading: !profiles.has(activeId) });
-  void searchad?.status();
   await workspace?.setUser(session.user);
   if (version !== sessionVersion) return;
   await loadProfiles(version);

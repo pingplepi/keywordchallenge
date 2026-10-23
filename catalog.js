@@ -145,9 +145,12 @@ export function createCatalog(client) {
     page = 1;
     void search();
     if (user) {
-      const { data, error } = await client.rpc('keychallenge_is_admin');
+      const { data, error } = await client.from('keychallenge_admins').select('can_manage_api').eq('user_id', user.id).maybeSingle();
       if (version !== contextVersion) return;
-      isAdmin = !error && data === true;
+      isAdmin = !error && !!data;
+      $('adminPageDescription').textContent = data?.can_manage_api === true
+        ? '공용 키워드 목록과 검색 API 연결을 관리하세요.'
+        : '공용 키워드 목록을 관리하고 API 사용 현황을 확인하세요.';
       $('catalogAdmin').hidden = !isAdmin;
       $('adminNav').hidden = !isAdmin;
       $('adminBadge').hidden = !isAdmin;

@@ -66,8 +66,8 @@
       </section>
 
       <section id="catalogAdmin" hidden aria-labelledby="adminPageTitle">
-        <div class="work-heading"><div><p class="eyebrow">SERVICE SETTINGS</p><h1 id="adminPageTitle">관리자 설정</h1><p class="muted">공용 키워드 목록과 검색 API 연결을 관리하세요.</p></div></div>
-        <section id="searchadSettings" class="panel admin-panel searchad-settings">
+        <div class="work-heading"><div><p class="eyebrow">SERVICE SETTINGS</p><h1 id="adminPageTitle">관리자 설정</h1><p id="adminPageDescription" class="muted">공용 키워드 목록과 API 사용 현황을 확인하세요.</p></div></div>
+        <section id="searchadSettings" class="panel admin-panel searchad-settings" hidden>
           <p class="eyebrow">SEARCH VOLUME CONNECTION</p><h2>네이버 월 검색량 연결</h2><span id="searchadState" class="status-pill">검색광고 연결 대기</span>
           <p class="muted">네이버 검색광고의 API 사용 관리에 있는 값을 입력해 주세요. 고객 ID와 키는 내 Supabase에 암호화하여 저장하고, 네이버 검색량 조회에만 사용합니다. 일반 회원에게는 노출되지 않습니다.</p>
           <form id="searchadForm" autocomplete="off"><div class="admin-fields"><label>고객 ID (Customer ID)<input id="searchadCustomer" inputmode="numeric" pattern="[0-9]{1,20}" maxlength="20" required autocomplete="off" /></label><label>API License<input id="searchadApi" type="password" maxlength="1024" required autocomplete="off" /></label><label>Secret Key<input id="searchadSecret" type="password" maxlength="1024" required autocomplete="off" /></label></div><button id="searchadSave" class="button" type="submit">연결 저장 · 검색량 수집 시작</button></form>
