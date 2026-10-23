@@ -63,6 +63,14 @@ body { font-size: var(--font-body); line-height: 1.7; }
 .work-panel > p:last-child, .admin-panel > p:last-child { margin-bottom: 0; }
 .message { font-size: var(--font-label); line-height: 1.7; }
 .message:empty { min-height: 0; margin: 0; }
+.auth-recovery-link {
+  display: flex; align-items: center; justify-content: center;
+  min-height: var(--control-height); margin-top: 8px;
+  color: var(--accent-dark); font-size: var(--font-label);
+  text-underline-offset: 3px;
+}
+.member-settings-link { display: flex; flex-wrap: wrap; gap: 8px 24px; }
+.member-settings-link a { display: inline-flex; align-items: center; min-height: var(--control-height); }
 
 .strategy-stats, .stats, .member-stats {
   gap: var(--grid-gap); margin: 0 0 var(--card-gap);

@@ -460,7 +460,13 @@ byId('autoRefreshToggle').addEventListener('change', toggleAutoRefresh);
 byId('exportButton').addEventListener('click', exportBackup);
 byId('importInput').addEventListener('change', importFiles);
 for (const id of ['searchInput', 'rankFilter', 'sortSelect']) byId(id).addEventListener('input', renderTable);
-initialize();
+// Older recovery links may still use the site root. Preserve their fragment
+// for the dedicated recovery client before the dashboard consumes the session.
+if (new URLSearchParams(window.location.hash.slice(1)).get('type') === 'recovery') {
+  window.location.replace(`/password-reset.html${window.location.hash}`);
+} else {
+  initialize();
+}
 
 function showPage() {
   const routes = ['strategyView','catalogView','catalogAdmin','accountView','bloggerView','keywordSearchView','savedKeywordsView','plannerView','blogAnalysisView','memberAdmin','membershipView'];
