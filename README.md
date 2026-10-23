@@ -210,7 +210,7 @@ API 키는 Supabase Vault에 암호화해 보관합니다. 관리자 로그인�
 
 ## 12. 내 블로그 분석과 검색 노출 점검
 
-`add_blog_analysis`, `add_blog_search_free_guard` 마이그레이션을 순서대로 적용하고 `keychallenge-blog-sync`, `keychallenge-blog-search` 함수를 배포합니다. 다른 프로젝트에 설치할 때 `dispatch_blog()`의 프로젝트 URL을 변경합니다.
+`add_blog_analysis`, `add_blog_search_free_guard`, `fix_blog_api_key_validation` 마이그레이션을 순서대로 적용하고 `keychallenge-blog-sync`, `keychallenge-blog-search` 함수를 배포합니다. 다른 프로젝트에 설치할 때 `dispatch_blog()`의 프로젝트 URL을 변경합니다.
 
 - **내 설정**에서 일반 블로거·인플루언서 모두 블로그 주소를 연결할 수 있습니다. 일반 블로거의 첫 대시보드는 분석 화면, 인플루언서는 기존 키챌 대시보드입니다. 공통 메뉴는 `#blogAnalysisView`입니다.
 - 등록/주소 변경 시 수집을 예약하고, 매일 **04:30 KST**에 재수집합니다. 1분마다 대기 작업이 있을 때만 최대 3개의 워커를 호출합니다. 사이트나 컴퓨터를 닫아도 작동합니다.
