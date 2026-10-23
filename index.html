@@ -31,6 +31,7 @@
     <link rel="stylesheet" href="/blogger.css" />
     <link rel="stylesheet" href="/membership.css" />
     <link rel="stylesheet" href="/blog-analysis.css" />
+    <link rel="stylesheet" href="/ui-system.css" />
   </head>
   <body>
     <main class="shell">
@@ -53,7 +54,7 @@
       <section id="strategyView" hidden aria-label="키온 대시보드"></section>
 
       <section id="catalogView" hidden aria-labelledby="catalogTitle">
-        <div class="catalog-hero"><div><p class="eyebrow">ALL FIELDS · KEYWORD EXPLORER</p><h1 id="catalogTitle">다음 키워드를<br /><span>발견하는 곳.</span></h1><p class="muted">여행부터 뷰티, 푸드, 테크까지.<br />아직 참여하지 않은 키워드도 한곳에서 찾아보세요.</p></div><div class="catalog-summary panel"><span id="catalogCoverage" class="status-pill">목록 준비 중</span><strong><span id="catalogTotal">—</span><small>개 키워드</small></strong><div><span id="catalogFieldCount">—</span>개 분야 · 로그인 없이 검색</div><p id="catalogDate" class="muted">불러오는 중</p></div></div>
+        <div class="work-heading"><div><p class="eyebrow">ALL FIELDS · KEYWORD EXPLORER</p><h1 id="catalogTitle">전체 키챌 목록</h1><p class="muted">여행부터 뷰티, 푸드, 테크까지. 아직 참여하지 않은 키워드도 한곳에서 찾아보세요.</p></div></div><div class="catalog-summary panel"><span id="catalogCoverage" class="status-pill">목록 준비 중</span><strong><span id="catalogTotal">—</span><small>개 키워드</small></strong><div><span id="catalogFieldCount">—</span>개 분야 · 로그인 없이 검색</div><p id="catalogDate" class="muted">불러오는 중</p></div>
         <section class="panel table-panel">
           <div class="table-heading"><div><h2>전체 키워드 검색</h2><p id="catalogSource" class="muted">공용 키워드 목록을 불러오고 있습니다.</p></div></div>
           <div class="catalog-filters"><label class="catalog-query">키워드<input id="catalogSearch" type="search" maxlength="100" placeholder="예: 제주, 캠핑, 피부관리" /></label><label>분야<select id="catalogField"><option value="">모든 분야</option></select></label><label>내 참여 여부<select id="catalogParticipation" disabled><option value="all">전체</option><option value="joined">참여 키워드</option><option value="unjoined">미참여 / 기록 없음</option></select></label><label>정렬<select id="catalogSort"><option value="participants_desc">참여자 많은순</option><option value="participants_asc">참여자 적은순</option><option value="name">이름순</option></select></label></div>
@@ -64,14 +65,16 @@
         </section>
       </section>
 
-      <section id="catalogAdmin" class="panel admin-panel" hidden aria-labelledby="adminTitle">
-        <section id="searchadSettings" class="searchad-settings">
+      <section id="catalogAdmin" hidden aria-labelledby="adminPageTitle">
+        <div class="work-heading"><div><p class="eyebrow">SERVICE SETTINGS</p><h1 id="adminPageTitle">관리자 설정</h1><p class="muted">공용 키워드 목록과 검색 API 연결을 관리하세요.</p></div></div>
+        <section id="searchadSettings" class="panel admin-panel searchad-settings">
           <p class="eyebrow">SEARCH VOLUME CONNECTION</p><h2>네이버 월 검색량 연결</h2><span id="searchadState" class="status-pill">검색광고 연결 대기</span>
           <p class="muted">네이버 검색광고의 API 사용 관리에 있는 값을 입력해 주세요. 고객 ID와 키는 내 Supabase에 암호화하여 저장하고, 네이버 검색량 조회에만 사용합니다. 일반 회원에게는 노출되지 않습니다.</p>
           <form id="searchadForm" autocomplete="off"><div class="admin-fields"><label>고객 ID (Customer ID)<input id="searchadCustomer" inputmode="numeric" pattern="[0-9]{1,20}" maxlength="20" required autocomplete="off" /></label><label>API License<input id="searchadApi" type="password" maxlength="1024" required autocomplete="off" /></label><label>Secret Key<input id="searchadSecret" type="password" maxlength="1024" required autocomplete="off" /></label></div><button id="searchadSave" class="button" type="submit">연결 저장 · 검색량 수집 시작</button></form>
           <button id="searchadPause" class="button button-quiet" type="button" hidden>검색량 수집 일시 중지</button><p id="searchadStatus" class="message" role="status"></p>
           <p class="muted small">월 검색량은 PC+모바일 합산입니다. ‘10 미만’ 응답은 범위로 표시합니다. 매일 오전 4시 15분부터 미수집·30일 지난 데이터를 순차 갱신합니다.</p>
         </section>
+        <section class="panel admin-panel" aria-labelledby="adminTitle">
         <p class="eyebrow">CATALOG ADMIN</p><h2 id="adminTitle">공용 키워드 목록 관리</h2>
         <p class="muted">등록한 목록은 모든 방문자에게 공개됩니다. 키워드 이름·분야·참여자 수만 등록하며, 회원의 개인 수집 데이터는 별도로 보관됩니다.</p>
         <form id="catalogImportForm"><fieldset id="catalogImportControls">
@@ -82,6 +85,7 @@
           </div>
         </fieldset><p id="catalogImportMessage" class="message" role="status" aria-live="polite"></p></form>
         <details><summary>목록 파일 형식</summary><p class="muted">JSON의 items 배열에 id, name, field, fieldGroup, categoryId, participantCount를 넣어 주세요. 수집기에서 만든 파일 또는 기존 전체 키워드 JSON을 사용할 수 있습니다. 키워드 ID는 문자열을 권장합니다.</p></details>
+        </section>
       </section>
 
       <section id="setupView" class="panel setup" hidden>
