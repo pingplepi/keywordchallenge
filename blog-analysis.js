@@ -8,15 +8,15 @@ const states = {queued:'글 수집 대기',running:'글 수집 중',succeeded:'�
 const empty = message => `<div class="work-empty">${esc(message)}</div>`;
 export function createBlogAnalysis(client) {
   let user=null,epoch=0,version=0,page=1,visible=false,pollTimer,filterTimer,busy=false,refreshing=false;
-  $('blogAnalysisView').innerHTML=`<div class="work-heading"><div><p class="eyebrow">YOUR BLOG · AT A GLANCE</p><h1>내 블로그 분석</h1><p class="muted">최근 글은 매일 자동 수집하고, 검색 노출은 필요할 때 버튼으로 점검하세요.</p></div><a class="button button-light" href="#accountView">블로그 연결·설정 ↗</a></div>
+  $('blogAnalysisView').innerHTML=`<div class="work-heading"><div><p class="eyebrow">YOUR BLOG · AT A GLANCE</p><h1>내 블로그 분석</h1><p class="muted">로그인하면 새 글을 자동으로 가져옵니다. 검색 노출은 필요할 때 버튼으로 점검하세요.</p></div><a class="button button-light" href="#accountView">블로그 연결·설정 ↗</a></div>
     <p id="analysisMessage" class="message" role="status"></p>
     <div id="analysisContent" hidden>
-      <section class="panel work-panel analysis-connection"><div class="analysis-collection-info"><div id="analysisIdentity" class="work-identity"></div><p id="analysisUpdated" class="muted small"></p><p class="muted small">글은 매일 자동으로 수집합니다. 이 화면을 열거나 새로고침하면 새 글도 가져옵니다.</p><p id="analysisSearchStatus" class="muted small" role="status"></p></div><div class="analysis-check-actions"><p id="analysisSearchSummary" class="small" aria-live="polite"></p><button id="blogCheckSearch" class="button">검색 노출 점검</button><small class="muted">최근 글 최대 20개 · 한국시간 자정 초기화</small></div></section>
+      <section class="panel work-panel analysis-connection"><div class="analysis-collection-info"><div id="analysisIdentity" class="work-identity"></div><p id="analysisUpdated" class="muted small"></p><p class="muted small">로그인할 때 새 글을 자동으로 가져옵니다. 이 화면을 열거나 새로고침해도 갱신됩니다.</p><p id="analysisSearchStatus" class="muted small" role="status"></p></div><div class="analysis-check-actions"><p id="analysisSearchSummary" class="small" aria-live="polite"></p><button id="blogCheckSearch" class="button">검색 노출 점검</button><small class="muted">최근 글 최대 20개 · 한국시간 자정 초기화</small></div></section>
       <div id="analysisNotice" class="analysis-note" role="status"></div>
       <div class="strategy-stats work-stats"><div class="panel metric"><span>수집한 글</span><strong id="analysisTotal">—</strong><small>연결 후 누적한 공개 글</small></div><div class="panel metric metric-green"><span>검색 확인</span><strong id="analysisFound">—</strong><small>최근 수집 글 최대 20개 기준</small></div><div class="panel metric metric-purple"><span>검색 재확인 필요</span><strong id="analysisUnconfirmed">—</strong><small>조회 범위에서 찾지 못한 글</small></div><div class="panel metric"><span>오늘 발견한 글</span><strong id="analysisNew">—</strong><small>발행일과 관계없이 첫 수집 기준</small></div></div>
       <div class="work-two-columns"><section class="panel work-panel"><div class="work-section-title"><h2>블로그 활동 흐름</h2><span class="count-chip">최근 28일</span></div><div id="analysisActivity"></div><p class="muted small">수집된 글의 발행일 기준입니다. 과거 글 전체 통계가 아닙니다.</p></section><section class="panel work-panel"><h2>오늘의 확인 사항</h2><div id="analysisTasks"></div><a class="analysis-keyword-link" href="#keywordSearchView">다음 글의 키워드 검색하기 ↗</a></section></div>
       <section class="panel work-panel"><div class="work-section-title"><h2>수집한 글과 검색 노출</h2><span id="analysisCount" class="muted small" aria-live="polite"></span></div><div class="work-filters analysis-filters"><label>글 제목 검색<input id="analysisQuery" type="search" maxlength="100" placeholder="수집된 글 제목에서 찾기" /></label><label>확인 상태<select id="analysisFilter"><option value="">전체 상태</option><option value="found">검색 확인</option><option value="unconfirmed">조회 범위에서 미확인</option><option value="pending">확인 대기</option><option value="error">조회 실패</option></select></label></div><div id="analysisRows"></div><div class="pagination"><button id="analysisPrev" class="button button-light">이전</button><span id="analysisPage"></span><button id="analysisNext" class="button button-light">다음</button></div>
-      <details class="analysis-method"><summary>수집 범위와 검색 확인 기준</summary><p>매일 오전 4시 30분(한국시간)부터 공개 RSS의 최근 글을 수집합니다. 이 화면을 열거나 새로고침할 때도 새 글 수집을 요청하며, 짧은 시간의 반복 요청은 합쳐 처리합니다. 네이버 RSS 반영에 시간이 걸릴 수 있습니다. 처음 연결하면 RSS에서 제공하는 최근 글부터 누적하며, 공개·외부 공유 설정에 따라 수집 범위가 달라질 수 있습니다.</p><p>검색 노출 점검 버튼을 누르면 새 글을 먼저 가져온 뒤 최근 20개를 대상으로 제목과 제목의 앞부분을 검색하고, 검색어별 정확도순 최대 100개 결과에서 글 주소가 일치하는지 확인합니다. 검색어 하나에서 찾으면 확인을 마칩니다. 오래된 글의 상태는 마지막 확인 기록입니다.</p><p>‘조회 범위에서 미확인’은 검색 누락이나 저품질 확정이 아닙니다. 실제 통합검색 순위와도 다릅니다. 오류·연결 대기는 검색 미확인으로 집계하지 않습니다.</p><p>검색 노출 점검은 계정당 하루 3회이며 한국시간 자정에 초기화됩니다. 한 번 누르면 최근 글 최대 20개를 점검합니다. 글 수집과 화면 새로고침은 횟수를 사용하지 않습니다. 검색을 시작한 요청은 오류가 나도 1회에 포함되며, 진행 중인 요청의 중복 클릭은 추가로 차감하지 않습니다. 검색 점검은 키온 전체 회원 합산 하루 20,000회·월 600,000회 이내에서 진행합니다. 한도에 도달하거나 요청 후 1시간이 지나면 해당 요청을 종료하며, 나중에 버튼을 눌러 다시 요청해야 합니다. 검색 점검이 중지되어도 최근 글 수집과 기존 확인 기록은 유지됩니다.</p></details></section>
+      <details class="analysis-method"><summary>수집 범위와 검색 확인 기준</summary><p>로그인하거나 로그인 상태로 사이트에 다시 접속하면 공개 RSS의 최근 글을 수집합니다. 이 화면을 열거나 새로고침할 때도 새 글 수집을 요청하며, 짧은 시간의 반복 요청은 합쳐 처리합니다. 네이버 RSS 반영에 시간이 걸릴 수 있습니다. 처음 연결하면 RSS에서 제공하는 최근 글부터 누적하며, 공개·외부 공유 설정에 따라 수집 범위가 달라질 수 있습니다.</p><p>검색 노출 점검 버튼을 누르면 새 글을 먼저 가져온 뒤 최근 20개를 대상으로 제목과 제목의 앞부분을 검색하고, 검색어별 정확도순 최대 100개 결과에서 글 주소가 일치하는지 확인합니다. 검색어 하나에서 찾으면 확인을 마칩니다. 오래된 글의 상태는 마지막 확인 기록입니다.</p><p>‘조회 범위에서 미확인’은 검색 누락이나 저품질 확정이 아닙니다. 실제 통합검색 순위와도 다릅니다. 오류·연결 대기는 검색 미확인으로 집계하지 않습니다.</p><p>검색 노출 점검은 계정당 하루 3회이며 한국시간 자정에 초기화됩니다. 한 번 누르면 최근 글 최대 20개를 점검합니다. 글 수집과 화면 새로고침은 횟수를 사용하지 않습니다. 검색을 시작한 요청은 오류가 나도 1회에 포함되며, 진행 중인 요청의 중복 클릭은 추가로 차감하지 않습니다. 검색 점검은 키온 전체 회원 합산 하루 20,000회·월 600,000회 이내에서 진행합니다. 한도에 도달하거나 요청 후 1시간이 지나면 해당 요청을 종료하며, 나중에 버튼을 눌러 다시 요청해야 합니다. 검색 점검이 중지되어도 최근 글 수집과 기존 확인 기록은 유지됩니다.</p></details></section>
     </div>`;
   const admin=document.createElement('section');admin.className='searchad-settings';admin.innerHTML=`<p class="eyebrow">BLOG SEARCH CONNECTION</p><h2>블로그 검색 노출 점검 연결</h2><p class="muted">네이버 클라우드의 NAVER API HUB에서 ‘블로그 — NAVER Search Blog API’를 등록해 주세요. 기존 검색광고 API와 별도 연결입니다. 일반 회원은 블로그 주소만 등록하면 됩니다.</p>
     <p><a href="https://guide.ncloud-docs.com/docs/apihub-application" target="_blank" rel="noopener noreferrer">API HUB 등록·한도 설정 안내 ↗</a> · <a href="https://www.ncloud.com/product/applicationService/naverApiHub" target="_blank" rel="noopener noreferrer">현재 요금 확인 ↗</a></p>
@@ -53,7 +53,7 @@ export function createBlogAnalysis(client) {
       $('analysisContent').hidden=!m;
       if(!m){$('analysisMessage').innerHTML='<div class="panel work-panel"><h2>블로그 주소를 한 번만 연결하세요</h2><p>최근 글 자동 수집을 시작합니다. 검색 노출 점검은 연결 후 버튼으로 요청할 수 있습니다.</p><a class="button" href="#accountView">내 블로그 연결하기 ↗</a></div>';return;}
       message('');$('analysisIdentity').innerHTML=`<a class="profile-chip" href="https://blog.naver.com/${encodeURIComponent(m.blog_id)}" target="_blank" rel="noopener noreferrer">${esc(m.blog_title||m.blog_id)} ↗</a><span class="status-pill">${states[m.status]}</span>`;
-      $('analysisUpdated').textContent=`최근 글 수집 ${stamp(m.rss_updated_at)} · 매일 오전 4:30부터 순차 갱신`;
+      $('analysisUpdated').textContent=`최근 글 수집 ${stamp(m.rss_updated_at)} · 로그인 시 자동 갱신`;
       const notices=[];
       const waiting=connectionNotice(connection);
       const searchActive=search&&['queued','running'].includes(search.status)&&Date.parse(search.expires_at)>Date.now();
@@ -78,16 +78,16 @@ export function createBlogAnalysis(client) {
       schedule(searchActive||m.status==='running'||(m.status==='queued'&&Date.parse(m.next_attempt_at)<=Date.now()+60000),nextWake.length?Math.min(...nextWake):0);
     }catch(error){if(g===epoch&&v===version){message('블로그 분석 정보를 불러오지 못했습니다. 잠시 후 다시 열어 주세요.',true);schedule(true);}}
   }
-  async function openAnalysis(){
-    if(!user||!visible||refreshing)return;
+  async function refreshPosts(){
+    if(!user||refreshing)return;
     const g=epoch;refreshing=true;let failed=false;
     try{
       await load();
-      if(g!==epoch||!visible)return;
+      if(g!==epoch)return;
       const {error}=await client.rpc('keychallenge_blog_control');
       if(error)throw error;
     }catch{failed=true;}
-    finally{if(g===epoch){refreshing=false;await load();if(failed&&visible)message('새 글 수집을 요청하지 못했습니다. 기존 글은 확인할 수 있으며, 매일 자동 수집은 계속됩니다.',true);}}
+    finally{if(g===epoch){refreshing=false;await load();if(failed&&visible)message('새 글 수집을 요청하지 못했습니다. 기존 글은 확인할 수 있습니다. 잠시 후 새로고침해 주세요.',true);}}
   }
   async function requestSearch(){
     if(!user||busy)return;const g=epoch;busy=true;let feedback='',failed=false;
@@ -149,5 +149,5 @@ export function createBlogAnalysis(client) {
   $('blogApiForm').addEventListener('submit',e=>{e.preventDefault();void saveConnection('save');});
   $('blogApiPause').addEventListener('click',()=>void saveConnection('pause'));
   $('blogApiConfirm').addEventListener('click',()=>void saveConnection('confirm'));
-  return {setUser(next){if(user?.id===next?.id)return;user=next;epoch++;version++;page=1;busy=false;refreshing=false;clearTimeout(pollTimer);clearTimeout(filterTimer);$('analysisContent').hidden=true;$('analysisQuery').value='';$('analysisFilter').value='';$('blogApiForm').reset();$('blogApiMessage').textContent='';$('blogApiSave').disabled=false;$('blogApiPause').disabled=false;$('blogApiConfirm').disabled=false;$('blogApiUsage').textContent='';message('');if(user){void connection();if(visible)void openAnalysis();}},show(name){const wasVisible=visible;visible=name==='blogAnalysisView';if(visible){if(wasVisible)void load();else void openAnalysis();}else clearTimeout(pollTimer);if(name==='catalogAdmin')void connection(true);}};
+  return {setUser(next){if(user?.id===next?.id)return;user=next;epoch++;version++;page=1;busy=false;refreshing=false;clearTimeout(pollTimer);clearTimeout(filterTimer);$('analysisContent').hidden=true;$('analysisQuery').value='';$('analysisFilter').value='';$('blogApiForm').reset();$('blogApiMessage').textContent='';$('blogApiSave').disabled=false;$('blogApiPause').disabled=false;$('blogApiConfirm').disabled=false;$('blogApiUsage').textContent='';message('');if(user){void connection();void refreshPosts();}},show(name){const wasVisible=visible;visible=name==='blogAnalysisView';if(visible){if(wasVisible)void load();else void refreshPosts();}else clearTimeout(pollTimer);if(name==='catalogAdmin')void connection(true);}};
 }
