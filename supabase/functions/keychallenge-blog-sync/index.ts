@@ -28,6 +28,10 @@ Deno.serve(async req => {
     }
     const started=Date.now();
     job=await searchWorker('claim');if(!job)return reply(200,{idle:true});
+    if(job.phase==='rss')job=await searchWorker('feed',job,await recentPosts(job.blog_id));
+    if(!job.pending_ids.length&&!job.current_post_id){
+      await searchWorker('finish',job);return reply(200,{processed:0});
+    }
     const availability=await budget();
     if(availability?.allowed!==true){await searchWorker('stop',job,availability||{});return reply(200,{stopped:true});}
     const credentials=await data(db.rpc('keychallenge_blog_credentials'));
@@ -39,7 +43,7 @@ Deno.serve(async req => {
       const evidence:any[]=[];let status='unconfirmed',error:string|null=null;
       try{
         for(const query of titleQueries(post.title)){
-          // A live manual request, post cooldown and shared free budget must all allow this call.
+          // A live manual request, account daily quota and shared free budget must all allow this call.
           const reservation=await searchWorker('reserve',job,{post_id:post.post_id,query});
           if(reservation?.allowed!==true){await searchWorker('stop',job,reservation||{});return reply(200,{stopped:true});}
           if(!(Date.now()<Date.parse(reservation.valid_before))){
