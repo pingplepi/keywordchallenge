@@ -487,6 +487,7 @@ function showPage() {
     if (active) link.setAttribute('aria-current','page'); else link.removeAttribute('aria-current');
   });
   workspace?.show(page);
+  strategy?.show(page);
   blogAnalysis?.show(page);
   membership?.show(page);
 }

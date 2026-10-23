@@ -1,3 +1,5 @@
+import { createKeywordOpportunities } from './keyword-opportunities.js';
+
 const $ = id => document.getElementById(id);
 const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const num = value => value == null ? '—' : Number(value).toLocaleString('ko-KR');
@@ -24,7 +26,7 @@ export function createStrategy(client) {
         <button class="panel metric metric-purple" data-filter="near"><span>4~10위 공략</span><strong id="metricNear">—</strong><small>TOP 3 진입을 노릴 키워드 ↗</small></button>
       </div>
       <section class="panel strategy-panel" id="strategyAttack"><div class="section-heading"><div><p class="eyebrow">NEXT BEST ACTION</p><h2>오늘의 공략 <span class="count-chip">TOP 10</span></h2><p class="muted">4~10위 키워드에서 순위·변화·참여자 수·콘텐츠 수·확인된 검색량을 함께 고려합니다.</p></div></div><div id="strategyAttacks"></div><details class="score-note"><summary>공략 순위는 어떻게 정하나요?</summary><p>TOP3에 가까운 순위에 가장 높은 비중을 두고, 이전보다 상승한 키워드·참여자가 적은 키워드·등록 콘텐츠가 적은 키워드를 가산합니다. 월 검색량이 수집된 경우 검색량도 반영합니다. 추천은 순위 상승을 보장하지 않습니다.</p></details></section>
-      <section class="panel strategy-panel"><div class="section-heading"><div><p class="eyebrow">RANK HISTORY</p><h2>순위 변화</h2><p id="strategyComparison" class="muted"></p></div><span class="chart-legend"><i></i> TOP3 <i class="near"></i> 4~10위</span></div><div id="strategyTrend"></div><div id="strategyChanges"></div></section>
+      <section class="panel strategy-panel" id="strategyOpportunities"></section>
       <section class="panel strategy-panel"><div class="section-heading"><div><p class="eyebrow">DAILY MOVEMENT</p><h2>오늘의 순위변동</h2><p class="muted">가장 최근 수집일과 그 이전 수집일을 비교합니다.</p></div></div><div id="strategyMovementStats" class="movement-stats"></div><div class="movement-tabs" role="group" aria-label="순위변동 종류"><button data-mover="up" class="active">상승 TOP10</button><button data-mover="down">하락 TOP10</button><button data-mover="new_top3">신규 TOP3</button><button data-mover="left_top3">TOP3 이탈</button></div><div id="strategyMovers"></div></section>
       <details id="strategyDetails" class="panel strategy-panel strategy-details"><summary><div><h2>전체 키챌 목록 · 상세필터</h2><p class="muted">분야 · 참여 상태 · 참여자 수 · 내 순위 · 등록 콘텐츠 · 월 검색량</p></div><span class="count-chip">펼치기 / 접기</span></summary>
         <div class="detail-filters"><label class="wide-filter">키챌명 검색<input id="detailQuery" type="search" maxlength="100" placeholder="찾고 싶은 키워드를 입력하세요" /></label><label>분야<select id="detailField"><option value="">모든 분야</option></select></label><label>참여 상태<select id="detailStatus"><option value="all">전체</option><option value="joined">참여 전체</option><option value="top3">TOP3</option><option value="near">4~10위 공략</option><option value="unjoined">미참여 / 기록 없음</option><option value="unranked">참여 · 순위 미확인</option></select></label></div>
@@ -37,6 +39,7 @@ export function createStrategy(client) {
     </div>
     <dialog id="keywordDialog" class="keyword-dialog"><div class="dialog-head"><p class="eyebrow">KEYWORD DETAIL</p><button id="closeKeyword" class="button button-light" aria-label="키워드 상세 닫기">닫기</button></div><div id="keywordDetail"></div></dialog>`;
 
+  const opportunities = createKeywordOpportunities(client,{remember,onDetail:detail});
   function remember(rows) { for (const row of rows || []) records.set(row.keyword_id, {...records.get(row.keyword_id),...row}); }
   const keywordButton = row => `<button class="keyword-button" data-keyword="${esc(row.keyword_id)}">${esc(row.name)}</button>`;
   function movementTable(rows) {
@@ -47,14 +50,6 @@ export function createStrategy(client) {
   function renderMovers() {
     document.querySelectorAll('[data-mover]').forEach(button=>{button.classList.toggle('active',button.dataset.mover===mover);button.setAttribute('aria-pressed',String(button.dataset.mover===mover));});
     $('strategyMovers').innerHTML = data?.movement ? movementTable(data.movement.movers[mover]) : empty('비교할 이전 날짜의 수집 기록이 없습니다. 다음 날짜의 수집부터 표시됩니다.');
-  }
-  function trend() {
-    const rows = data.timeline;
-    if (!rows?.length) return empty('전체 수집이 완료되면 일별 이력이 저장됩니다.');
-    const width=800,height=150,pad=28,max=Math.max(1,...rows.flatMap(r=>[r.top3,r.near]));
-    const x=i=>rows.length===1?width/2:pad+i*(width-2*pad)/(rows.length-1), y=v=>height-pad-v*(height-2*pad)/max;
-    const line=key=>rows.map((r,i)=>`${x(i)},${y(r[key])}`).join(' ');
-    return `<div class="history-chart"><svg viewBox="0 0 ${width} ${height}" role="img" aria-label="날짜별 TOP3 및 4~10위 키워드 수"><path d="M${pad} ${height-pad}H${width-pad}" stroke="#e8e5ef"/>${['top3','near'].map((key,k)=>`<polyline points="${line(key)}" fill="none" stroke="${k?'#b9a7ed':'#7256d8'}" stroke-width="3"/>${rows.map((r,i)=>`<circle cx="${x(i)}" cy="${y(r[key])}" r="4" fill="${k?'#b9a7ed':'#7256d8'}"><title>${r.snapshot_date} · ${key==='top3'?'TOP3':'4~10위'} ${r[key]}개</title></circle>`).join('')}`).join('')}</svg><div class="chart-dates"><span>${esc(rows[0].snapshot_date)}</span><span>${rows.length===1?'첫 기록 · 일별 비교 대기':esc(rows.at(-1).snapshot_date)}</span></div></div>`;
   }
   function render() {
     if(data.field && !Array.from($('strategyField').options).some(option=>option.value===data.field)) {
@@ -72,9 +67,6 @@ export function createStrategy(client) {
       if(row.challenge_count<=2)reasons.push(`등록 콘텐츠 ${row.challenge_count}개 · 보완 후보`);
       return `<tr><td><span class="priority-number">${i+1}</span></td><td>${keywordButton(row)}</td><td>${esc(row.field)}</td><td>${num(row.participant_count)}</td><td>${volume(row)}</td><td><strong class="rank-mid">${rank(row.current_rank)}</strong></td><td class="reason">${reasons.map(esc).join(' · ')}</td></tr>`;
     }).join('')):empty('선택한 분야에 현재 4~10위 키워드가 없습니다.');
-    $('strategyComparison').textContent=data.previous_date?`${data.previous_date} → ${data.current_date} · 실제 저장된 날짜 기준`:`${data.current_date} 첫 기준 저장 · 이전 날짜의 기록이 쌓이면 변화를 비교합니다.`;
-    $('strategyTrend').innerHTML=trend();
-    $('strategyChanges').innerHTML=data.movement?movementTable(data.movement.changes.slice(0,10)):empty('이전 날짜 데이터가 없어 순위 변화는 아직 계산하지 않습니다.');
     $('strategyMovementStats').innerHTML=[['비교 키챌','compared'],['상승','up'],['하락','down'],['신규 TOP3','new_top3'],['TOP3 이탈','left_top3']].map(([label,key])=>`<div><span>${label}</span><strong>${num(data.movement?.[key])}</strong></div>`).join('');
     renderMovers();
     $('strategyVolumeNote').textContent=`검색량이 확인된 ${num(data.volume_covered)} / ${num(data.total)}개 키워드에서 미참여 후보를 찾습니다. 네이버 검색광고의 월 PC+모바일 검색량 기준입니다.`;
@@ -84,6 +76,7 @@ export function createStrategy(client) {
     if(!profile||!user)return;
     const v=++version, id=profile.influencerId;
     $('strategyError').hidden=true;$('strategyRefresh').disabled=true;
+    void opportunities.load($('strategyField').value);
     try{
       const {data:response,error}=await client.rpc('keychallenge_strategy',{p_influencer_id:id,p_field:$('strategyField').value});
       if(v!==version)return;if(error)throw error;
@@ -138,10 +131,11 @@ export function createStrategy(client) {
   for(const id of ['detailField','detailStatus','detailSort'])$(id).addEventListener('change',()=>{page=1;void search();});
   $('detailReset').addEventListener('click',()=>{for(const id of ['detailQuery',...['p','r','c','v'].flatMap(k=>[`detail${k}min`,`detail${k}max`])])$(id).value='';$('detailField').value=data?.field||'';$('detailStatus').value='all';$('detailSort').value='rank';page=1;void search();});
   $('detailPrev').addEventListener('click',()=>{if(page>1){page--;void search();}});$('detailNext').addEventListener('click',()=>{page++;void search();});
-  return {refresh,async setContext(nextUser,nextProfile,{loading=false,loadError=false}={}){
+  return {refresh,show:page=>opportunities.show(page),async setContext(nextUser,nextProfile,{loading=false,loadError=false}={}){
     const context=++contextVersion;
     const changed=profile?.influencerId!==nextProfile?.influencerId||user?.id!==nextUser?.id;
     user=nextUser;profile=nextProfile;version++;searchVersion++;detailVersion++;
+    opportunities.setContext(user,profile);
     $('strategyView').hidden=false;$('strategyEmpty').hidden=!!profile;$('strategyContent').hidden=!profile;
     $('strategyManageLink').hidden=!profile;
     if($('keywordDialog').open)$('keywordDialog').close();
