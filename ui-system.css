@@ -17,6 +17,7 @@
 }
 
 body { font-size: var(--font-body); line-height: 1.7; }
+.section-nav { align-items: center; padding-block: 14px; }
 .work-heading, .strategy-heading {
   display: flex; flex-direction: row; align-items: center;
   gap: var(--card-gap); padding: 32px 0 24px;
