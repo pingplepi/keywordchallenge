@@ -470,13 +470,13 @@ function showPage() {
   let page = routes.includes(hash) ? hash : 'strategyView';
   if (!session) page = page === 'catalogView' ? page : 'authView';
   else if (!['catalogView','memberAdmin','membershipView'].includes(page) && (!memberReady || !member)) page = 'accountView';
-  else if (page === 'strategyView' || page === 'bloggerView') page = member?.mode === 'blogger' ? 'blogAnalysisView' : 'strategyView';
+  else if (page === 'strategyView' || page === 'bloggerView') page = member?.mode === 'blogger' ? 'bloggerView' : 'strategyView';
   else if (page === 'plannerView') page = 'blogAnalysisView';
   document.body.dataset.page = page;
   byId('appView').hidden = !session || page !== 'accountView' || member?.mode !== 'influencer';
-  for (const id of ['accountView','keywordSearchView','savedKeywordsView','blogAnalysisView','memberAdmin','membershipView']) byId(id).hidden = page !== id;
+  for (const id of ['accountView','bloggerView','keywordSearchView','savedKeywordsView','blogAnalysisView','memberAdmin','membershipView']) byId(id).hidden = page !== id;
   document.querySelectorAll('.section-nav a').forEach(link => {
-    const active = link.getAttribute('href') === `#${page === 'blogAnalysisView' && !['blogAnalysisView','plannerView'].includes(hash) ? 'strategyView' : page}`;
+    const active = link.getAttribute('href') === `#${page === 'bloggerView' ? 'strategyView' : page === 'blogAnalysisView' && hash === 'plannerView' ? 'blogAnalysisView' : page}`;
     link.classList.toggle('active', active);
     if (active) link.setAttribute('aria-current','page'); else link.removeAttribute('aria-current');
   });

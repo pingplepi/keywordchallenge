@@ -1,3 +1,5 @@
+import { createBloggerDashboard } from './blogger-dashboard.js';
+
 const $ = id => document.getElementById(id);
 const esc = value => String(value ?? '').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const number = value => Number(value || 0).toLocaleString('ko-KR');
@@ -19,6 +21,7 @@ export function createBloggerWorkspace(client,{onMemberChange}) {
   let user=null,settings=null,loaded=false,generation=0,savedVersion=0,searchVersion=0;
   let savedPage=1,resultPage=1,results=[],resultQuery='',savedRecords=new Map();
   let toastTimer,searchController,dialogBusy=false;
+  const dashboard=createBloggerDashboard(client,{notify,onSearch(keyword){$('blogSearchQuery').value=keyword;location.hash='keywordSearchView';}});
   $('accountView').innerHTML=heading('YOUR WORKSPACE','내 작업 공간 설정','블로그 운영 방식에 맞는 대시보드를 선택하세요.')+'<p class="member-settings-link"><a href="#membershipView">내 이용 등급 · 사용량 보기 ↗</a></p><div id="workspaceSettingsBody" class="panel work-panel" aria-live="polite">계정 설정을 불러오고 있습니다…</div>';
   $('keywordSearchView').innerHTML=heading('KEYWORD DISCOVERY','키워드 검색','키워드 챌린지 목록에 없는 검색어도 자유롭게 찾아보세요.')+`
     <section class="panel work-panel"><form id="blogSearchForm" class="work-search-form"><label>검색할 키워드<input id="blogSearchQuery" type="search" maxlength="100" required placeholder="예: 제주 여행, 가을 코디, 집밥 메뉴" /></label><button id="blogSearchSubmit" class="button">검색량 조회</button></form><p class="muted small">네이버 검색광고의 최근 30일 PC·모바일 검색량입니다. ‘10 미만’ 응답은 범위로 표시합니다.</p><p id="blogSearchMessage" class="message" role="status">키워드를 입력하면 관련 키워드도 함께 보여드립니다.</p></section>
@@ -37,7 +40,7 @@ export function createBloggerWorkspace(client,{onMemberChange}) {
     $('memberForm').addEventListener('submit',async e=>{e.preventDefault();const g=generation;const mode=$('memberForm').querySelector('input[name="workspaceMode"]:checked').value;$('memberSubmit').disabled=true;try{
       const id=$('memberBlog').value.trim()?blogId($('memberBlog').value):null;
       const row=await checked(client.from('keychallenge_members').upsert({user_id:user.id,mode,blog_id:id,interest:$('memberInterest').value},{onConflict:'user_id'}).select().single());
-      if(g!==generation)return;settings=row;onMemberChange(settings);settingsForm();window.location.replace('#strategyView');notify('내 작업 공간을 저장했습니다.');
+      if(g!==generation)return;settings=row;dashboard.setContext(user,settings);onMemberChange(settings);settingsForm();window.location.replace('#strategyView');notify('내 작업 공간을 저장했습니다.');
     }catch(error){if(g===generation)$('memberMessage').textContent=error.message;}finally{if(g===generation)$('memberSubmit').disabled=false;}});
   }
   async function loadSaved(){if(!user||!loaded)return;const v=++savedVersion,g=generation;$('savedCount').textContent='불러오는 중…';try{
@@ -59,7 +62,7 @@ export function createBloggerWorkspace(client,{onMemberChange}) {
   }catch(error){if(g===generation&&v===searchVersion&&error.name!=='AbortError')$('blogSearchMessage').textContent=error.message;}finally{if(g===generation&&v===searchVersion)$('blogSearchSubmit').disabled=false;}});
   function openForm(title,body,save){
     dialog.innerHTML=`<div class="dialog-head"><h2>${title}</h2><button type="button" class="button button-light" data-work-action="dialog-close">닫기</button></div><form id="workspaceEditForm">${body}<p id="workspaceEditError" class="message error" role="status"></p><div class="work-card-actions"><button class="button" id="workspaceEditSave">저장</button><button type="button" class="button button-light" data-work-action="dialog-close">취소</button></div></form>`;
-    dialogBusy=false;dialog.setAttribute('aria-label',title);dialog.showModal();$('workspaceEditForm').addEventListener('submit',async e=>{e.preventDefault();const g=generation;dialogBusy=true;dialog.querySelectorAll('button').forEach(button=>button.disabled=true);try{await save(new FormData(e.currentTarget),g);if(g!==generation)return;dialog.close();notify('저장했습니다.');await loadSaved();}catch(error){if(g===generation)$('workspaceEditError').textContent=error.message;}finally{if(g===generation){dialogBusy=false;dialog.querySelectorAll('button').forEach(button=>button.disabled=false);}}});
+    dialogBusy=false;dialog.setAttribute('aria-label',title);dialog.showModal();$('workspaceEditForm').addEventListener('submit',async e=>{e.preventDefault();const g=generation;dialogBusy=true;dialog.querySelectorAll('button').forEach(button=>button.disabled=true);try{await save(new FormData(e.currentTarget),g);if(g!==generation)return;dialog.close();dashboard.invalidate();notify('저장했습니다.');await loadSaved();}catch(error){if(g===generation)$('workspaceEditError').textContent=error.message;}finally{if(g===generation){dialogBusy=false;dialog.querySelectorAll('button').forEach(button=>button.disabled=false);}}});
   }
   function keywordForm(id){const row=savedRecords.get(id);openForm(row?'키워드 메모·폴더':'키워드 직접 추가',`<label>키워드<input name="keyword" maxlength="100" required value="${esc(row?.keyword||'')}" ${row?'readonly':''} /></label><label>폴더<input name="folder" maxlength="60" placeholder="예: 가을 여행, 제품 리뷰" value="${esc(row?.folder||'')}" /></label><label>메모<textarea name="notes" maxlength="2000" rows="4" placeholder="작성하고 싶은 내용이나 아이디어">${esc(row?.notes||'')}</textarea></label>`,async(form,g)=>{
     const keyword=String(form.get('keyword')).trim();if(!keyword)throw new Error('키워드를 입력해 주세요.');
@@ -70,11 +73,11 @@ export function createBloggerWorkspace(client,{onMemberChange}) {
     if(action==='dialog-close'){if(!dialogBusy)dialog.close();return;}
     if(action==='retry-member'){await api.setUser(user,true);return;}
     if(action==='keyword-new'||action==='keyword-edit'){keywordForm(button.dataset.id);return;}
-    if(action==='result-save'){button.disabled=true;await checked(client.rpc('keychallenge_save_blog_keyword',{p_keyword:button.dataset.keyword}));if(g!==generation)return;button.textContent='보관됨 ✓';notify('보관함에 저장했습니다.');return;}
+    if(action==='result-save'){button.disabled=true;await checked(client.rpc('keychallenge_save_blog_keyword',{p_keyword:button.dataset.keyword}));if(g!==generation)return;dashboard.invalidate();button.textContent='보관됨 ✓';notify('보관함에 저장했습니다.');return;}
     if(action==='keyword-archive'){
       const row=savedRecords.get(button.dataset.id);if(!row)return;button.disabled=true;
       await checked(client.from('keychallenge_blog_keywords').update({archived:!row.archived}).eq('id',row.id).eq('user_id',user.id).select('id').single());if(g!==generation)return;
-      notify(row.archived?'복원했습니다.':'보관을 해제했습니다.');savedPage=1;await loadSaved();return;
+      dashboard.invalidate();notify(row.archived?'복원했습니다.':'보관을 해제했습니다.');savedPage=1;await loadSaved();return;
     }
     if(action.startsWith('result-')){resultPage+=action==='result-next'?1:-1;renderResults();return;}
     if(action.startsWith('saved-')){savedPage=Math.max(1,savedPage+(action==='saved-next'?1:-1));await loadSaved();return;}
@@ -86,10 +89,10 @@ export function createBloggerWorkspace(client,{onMemberChange}) {
     if(!force&&loaded&&user?.id===nextUser?.id)return settings;
     const g=++generation;user=nextUser;settings=null;loaded=false;results=[];savedRecords.clear();searchController?.abort();searchVersion++;savedVersion++;clearTimeout(filterTimer);clearTimeout(toastTimer);
     dialogBusy=false;if(dialog.open)dialog.close();$('workspaceToast').hidden=true;$('blogSearchForm').reset();$('blogSearchSubmit').disabled=false;$('blogSearchMessage').textContent='키워드를 입력하면 관련 키워드도 함께 보여드립니다.';$('blogSearchResultsPanel').hidden=true;$('savedQuery').value='';$('savedFolder').innerHTML='<option value="">모든 폴더</option>';$('savedArchive').value='active';savedPage=1;$('savedRows').innerHTML='';
-    $('workspaceSettingsBody').textContent='계정 설정을 불러오고 있습니다…';
+    dashboard.setContext(user,null);$('workspaceSettingsBody').textContent='계정 설정을 불러오고 있습니다…';
     if(!user){onMemberChange(null,false);return null;}
-    try{const row=await checked(client.from('keychallenge_members').select('*').eq('user_id',user.id).maybeSingle());if(g!==generation)return null;settings=row;loaded=true;settingsForm();onMemberChange(settings,true);return settings;}
+    try{const row=await checked(client.from('keychallenge_members').select('*').eq('user_id',user.id).maybeSingle());if(g!==generation)return null;settings=row;loaded=true;dashboard.setContext(user,settings);settingsForm();onMemberChange(settings,true);return settings;}
     catch(error){if(g===generation){$('workspaceSettingsBody').innerHTML='<h2>설정을 불러오지 못했습니다.</h2><p class="muted">잠시 후 다시 불러와 주세요.</p><button class="button" data-work-action="retry-member">다시 불러오기</button>';onMemberChange(null,false);}return null;}
-  },show(page){if(!user||!loaded)return;if(page==='savedKeywordsView')void loadSaved();}};
+  },show(page){dashboard.show(page);if(!user||!loaded)return;if(page==='savedKeywordsView')void loadSaved();}};
   return api;
 }

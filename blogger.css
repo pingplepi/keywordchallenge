@@ -3,3 +3,40 @@
 @media(max-width:1000px){.work-keyword-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.section-nav{gap:19px;font-size:12px}.work-two-columns{gap:14px}.work-stats .metric{padding:20px 18px}.work-stats .metric strong{font-size:32px}}
 @media(max-width:700px){.work-heading{align-items:start;flex-direction:column;gap:17px;padding-top:28px}.work-heading h1{font-size:28px}.work-heading p.muted{font-size:13px}.work-panel{padding:20px}.work-two-columns{grid-template-columns:1fr;gap:0}.work-callout{padding:23px;align-items:start;flex-direction:column;gap:18px}.work-callout h2{font-size:22px}.work-stats{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.work-search-form{flex-direction:column;align-items:stretch}.work-filters{grid-template-columns:1fr 1fr;gap:10px}.work-filters>label:first-child{grid-column:1/-1}.work-mode-options{grid-template-columns:1fr;gap:12px}.work-form-columns{grid-template-columns:1fr;gap:0}.work-calendar{gap:3px}.calendar-day{padding:6px;min-height:65px;font-size:12px;gap:5px}.calendar-day small{font-size:9px}.work-calendar-toolbar{gap:8px}.work-calendar-toolbar h2{font-size:18px}.work-calendar-toolbar .button{font-size:11px;padding:8px 10px}.work-dialog{padding:21px}.work-identity{flex-wrap:wrap}}
 @media(max-width:440px){.work-keyword-grid{grid-template-columns:1fr}.work-panel{padding:16px}.work-calendar-toolbar{gap:6px}.work-calendar-toolbar .button-quiet{padding:8px 4px}.work-stats .metric{padding:17px 14px}.work-stats .metric>span{font-size:12px}.work-stats .metric>strong{font-size:30px}.work-stats .metric>small{font-size:10px}.work-list-row{align-items:start}.calendar-day{padding:5px 3px;min-height:64px}}
+
+/* General blogger discovery dashboard. Shares the global type and spacing scale. */
+.discovery-context{display:flex;justify-content:space-between;align-items:center;gap:var(--inner-gap);margin-bottom:var(--card-gap);flex-wrap:wrap}
+.discovery-context>div{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+.discovery-context a,.discovery-change a{color:var(--accent-dark);text-decoration:none}
+.discovery-context a{font-size:var(--font-label)}
+.discovery-unit{font-size:var(--font-label);font-weight:500;letter-spacing:0;margin-left:6px}
+.discovery-description{margin:0 0 var(--inner-gap);font-size:var(--font-body)}
+.discovery-angle{font-size:var(--font-caption);color:var(--muted)}
+.discovery-idea .discovery-prompt{font-size:var(--font-label);color:var(--muted);margin:12px 0 20px;line-height:1.8}
+.discovery-idea .work-volume{margin-top:auto}
+.discovery-idea>small{margin-top:0}
+.discovery-opportunities{list-style:none;margin:0;padding:0}
+.discovery-opportunities li{display:grid;grid-template-columns:28px minmax(0,1fr) auto auto;gap:16px;align-items:center;padding:16px 0;border-bottom:1px solid var(--line)}
+.discovery-opportunities li:last-child{border-bottom:0}
+.discovery-keyword strong{font-size:var(--font-body);overflow-wrap:anywhere}
+.discovery-keyword small,.discovery-volume small{display:block;font-size:var(--font-caption)}
+.discovery-volume{text-align:right;font-size:var(--font-body);font-variant-numeric:tabular-nums}
+.discovery-volume small{color:var(--muted)}
+.discovery-opportunities .button{min-height:var(--control-compact-height);padding:7px 12px;font-size:var(--font-caption)}
+.discovery-change{align-items:flex-start;flex-direction:column;gap:8px}
+.discovery-change>div{min-width:0}
+.discovery-change-label{font-size:var(--font-caption);white-space:normal}
+.discovery-saved-note{font-size:var(--font-caption);color:var(--muted);overflow-wrap:anywhere;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;margin:8px 0 0}
+.discovery-saved-volume{text-align:right;font-weight:700}
+.discovery-saved-volume small{font-weight:400}
+.discovery-method{font-size:var(--font-caption);color:var(--muted);margin:0 0 var(--card-gap)}
+.discovery-method summary{cursor:pointer;min-height:36px}
+.discovery-method p{max-width:90ch}
+#discoveryIdeas,#discoveryChanges{scroll-margin-top:20px}
+@media(max-width:700px){
+ .discovery-opportunities li{grid-template-columns:24px minmax(0,1fr) auto;gap:10px 12px}
+ .discovery-opportunities .button{grid-column:2/-1;justify-self:start;min-height:44px}
+ .discovery-idea .work-card-actions .button,.discovery-idea .work-text-button{min-height:44px}
+ .discovery-stats .metric>strong{font-size:var(--font-metric)}
+ .discovery-method summary{min-height:44px}
+}
