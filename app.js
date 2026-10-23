@@ -29,6 +29,7 @@ let refreshViewVersion = 0;
 function showView(name) {
   for (const [key, element] of Object.entries(views)) element.hidden = key !== name;
   byId('accountBar').hidden = name !== 'app';
+  if (name === 'app') views.app.hidden = document.body.dataset.page !== 'accountView' || member?.mode !== 'influencer';
 }
 
 function notify(message, isError = false) {
@@ -347,7 +348,7 @@ async function startCollection() {
     if (collectionController === controller) {
       collectionController = null;
       byId('collectButton').disabled = false;
-      byId('collectButton').textContent = '자동 수집 시작';
+      byId('collectButton').textContent = '인플홈 연결·갱신';
       byId('influencerInput').disabled = false;
       byId('cancelCollectionButton').hidden = true;
     }
@@ -433,6 +434,8 @@ async function initialize() {
   workspace = createBloggerWorkspace(supabase, { onMemberChange(next, ready = true) {
     member = next; memberReady = ready; showPage();
   } });
+  // Keep the collector's existing controls and listeners inside account settings.
+  byId('accountView').append(byId('appView'));
   searchad = connectSearchAd(supabase, () => strategy.refresh());
   void catalog.initialize();
   await loadRefreshSchedule();
@@ -460,16 +463,17 @@ for (const id of ['searchInput', 'rankFilter', 'sortSelect']) byId(id).addEventL
 initialize();
 
 function showPage() {
-  const routes = ['strategyView','catalogView','mySpace','catalogAdmin','accountView','bloggerView','keywordSearchView','savedKeywordsView','plannerView','blogAnalysisView','memberAdmin','membershipView'];
-  const hash = location.hash.slice(1);
+  const routes = ['strategyView','catalogView','catalogAdmin','accountView','bloggerView','keywordSearchView','savedKeywordsView','plannerView','blogAnalysisView','memberAdmin','membershipView'];
+  const legacyCollectionRoute = location.hash === '#mySpace';
+  const hash = legacyCollectionRoute ? 'accountView' : location.hash.slice(1);
+  if (legacyCollectionRoute) history.replaceState(history.state, '', '#accountView');
   let page = routes.includes(hash) ? hash : 'strategyView';
   if (!session) page = page === 'catalogView' ? page : 'authView';
   else if (!['catalogView','memberAdmin','membershipView'].includes(page) && (!memberReady || !member)) page = 'accountView';
   else if (page === 'strategyView' || page === 'bloggerView') page = member?.mode === 'blogger' ? 'blogAnalysisView' : 'strategyView';
   else if (page === 'plannerView') page = 'blogAnalysisView';
-  else if (page === 'mySpace' && member?.mode !== 'influencer') page = 'accountView';
   document.body.dataset.page = page;
-  byId('collectionNav').hidden = !session || member?.mode !== 'influencer';
+  byId('appView').hidden = !session || page !== 'accountView' || member?.mode !== 'influencer';
   for (const id of ['accountView','keywordSearchView','savedKeywordsView','blogAnalysisView','memberAdmin','membershipView']) byId(id).hidden = page !== id;
   document.querySelectorAll('.section-nav a').forEach(link => {
     const active = link.getAttribute('href') === `#${page === 'blogAnalysisView' && !['blogAnalysisView','plannerView'].includes(hash) ? 'strategyView' : page}`;

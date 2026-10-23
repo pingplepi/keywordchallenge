@@ -41,7 +41,7 @@
           <button id="signOutButton" class="button button-quiet" type="button">로그아웃</button>
         </div>
       </header>
-      <nav class="section-nav" aria-label="대시보드 메뉴"><a href="#strategyView">대시보드</a><a href="#blogAnalysisView">내 블로그 분석</a><a href="#keywordSearchView">키워드 검색</a><a href="#savedKeywordsView">보관함</a><a href="#catalogView">전체 키챌 목록</a><a id="collectionNav" href="#mySpace" hidden>수집·예약 관리</a><a href="#accountView">내 설정</a><a id="memberAdminNav" href="#memberAdmin" hidden>회원 관리</a><a id="adminNav" href="#catalogAdmin" hidden>관리자 설정</a></nav>
+      <nav class="section-nav" aria-label="대시보드 메뉴"><a href="#strategyView">대시보드</a><a href="#blogAnalysisView">내 블로그 분석</a><a href="#keywordSearchView">키워드 검색</a><a href="#savedKeywordsView">보관함</a><a href="#catalogView">전체 키챌 목록</a><a href="#accountView">내 설정</a><a id="memberAdminNav" href="#memberAdmin" hidden>회원 관리</a><a id="adminNav" href="#catalogAdmin" hidden>관리자 설정</a></nav>
       <section id="memberAdmin" hidden aria-label="회원 관리"></section>
       <section id="membershipView" hidden aria-label="내 이용 등급"></section>
       <section id="accountView" hidden aria-label="내 작업 공간 설정"></section>
@@ -91,7 +91,6 @@
         <a class="button" href="https://supabase.com/dashboard" target="_blank" rel="noreferrer">Supabase 열기 ↗</a>
       </section>
 
-      <div id="mySpace"></div>
       <section id="authView" class="auth-layout" hidden>
         <div class="intro">
           <p class="eyebrow">BLOG &amp; INFLUENCER · KEYWORDS</p>
@@ -108,13 +107,13 @@
         </form>
       </section>
 
-      <section id="appView" hidden>
+      <section id="appView" hidden aria-labelledby="influencerSettingsTitle">
         <div class="page-heading">
-          <div><p class="eyebrow">내 작업 공간</p><h1>내 참여 현황</h1><p class="muted">인플홈을 수집하면 전체 목록에서 참여·미참여 키워드를 구분할 수 있습니다.</p></div>
+          <div><p class="eyebrow">INFLUENCER SETTINGS</p><h2 id="influencerSettingsTitle">인플홈 관리</h2><p class="muted">인플홈 연결과 키워드 챌린지 순위 갱신을 설정하세요.</p></div>
         </div>
         <div id="notice" class="notice" role="status" hidden></div>
         <section class="panel collect-panel">
-          <div class="collect-form"><div class="input-grow"><label for="influencerInput">인플루언서 ID 또는 인플홈 주소</label><input id="influencerInput" placeholder="본인의 in.naver.com/아이디 주소를 입력하세요" /></div><button id="collectButton" class="button" type="button">자동 수집 시작</button></div>
+          <div class="collect-form"><div class="input-grow"><label for="influencerInput">인플루언서 ID 또는 인플홈 주소</label><input id="influencerInput" placeholder="본인의 in.naver.com/아이디 주소를 입력하세요" /></div><button id="collectButton" class="button" type="button">인플홈 연결·갱신</button></div>
           <div class="subtle">처음에는 주소를 입력하고 수집해 주세요. 저장한 인플홈은 매일 오전 4시(한국시간)부터 자동 갱신됩니다. 지금 수집하는 동안에는 이 화면을 열어 두세요.</div>
           <div id="collectorGuide" class="collector-guide" hidden>
             <div class="guide-head"><div><strong>공개 데이터 자동 수집</strong><p class="muted">전체 목록을 가져온 뒤 참여 여부와 순위를 업데이트합니다.</p></div><span id="collectorStatus" class="status-pill" role="status" aria-live="polite">대기 중</span></div>
@@ -127,13 +126,15 @@
 
         <section id="dashboard" hidden>
           <section id="refreshSettings" class="panel refresh-settings" hidden>
-            <div class="refresh-heading"><div><p class="eyebrow">DAILY REFRESH</p><h2>매일 갱신되는 내 키워드</h2></div><span id="refreshBadge" class="status-pill"></span></div>
+            <div class="refresh-heading"><div><p class="eyebrow">DAILY REFRESH</p><h2>키워드 챌린지 자동 갱신</h2></div><span id="refreshBadge" class="status-pill"></span></div>
             <label class="refresh-toggle"><input id="autoRefreshToggle" type="checkbox" />매일 오전 4시 자동 갱신</label>
-            <p class="muted small">한국시간 기준으로 참여 키워드와 순위를 순차 갱신합니다. 사이트와 컴퓨터를 꺼 두어도 실행됩니다.</p>
+            <p class="muted small">일별 순위 변화를 기록하기 위해 참여 키워드와 순위를 매일 갱신합니다. 블로그 글은 로그인 시 수집됩니다.</p>
             <p id="refreshNext" class="small"></p><p id="refreshLast" class="muted small"></p><p id="refreshStatus" class="message" role="status"></p>
           </section>
+          <details class="influencer-data-details"><summary>수집한 키워드 상세 보기</summary>
           <div class="stats"><article class="panel stat"><span>분석 대상</span><strong id="statId">-</strong></article><article class="panel stat"><span>참여 키워드</span><strong id="statTotal">-</strong></article><article class="panel stat"><span>TOP 3</span><strong id="statTop3">-</strong></article><article class="panel stat"><span>순위 확인</span><strong id="statRanked">-</strong></article></div>
           <section class="panel table-panel"><div class="table-heading"><div><h2>내 키챌 현황</h2><p class="muted">현재 순위, 참여 콘텐츠, 최근 참여 날짜를 확인합니다.</p></div><div class="filters"><input id="searchInput" placeholder="키워드 검색" /><select id="rankFilter"><option value="all">전체 순위</option><option value="3">TOP 3</option><option value="10">TOP 10</option><option value="100">100위 이내</option><option value="none">순위 없음</option></select><select id="sortSelect"><option value="rank">순위순</option><option value="recent">최근 참여순</option><option value="contents">콘텐츠 많은순</option></select></div></div><div id="keywordTable" class="table-wrap"></div></section>
+          </details>
         </section>
       </section>
     </main>
