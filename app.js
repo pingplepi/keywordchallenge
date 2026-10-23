@@ -1,6 +1,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { createCatalog } from './catalog.js';
 import { createStrategy, connectSearchAd } from './strategy.js';
+import { createBloggerWorkspace } from './blogger.js';
 
 const config = window.APP_CONFIG || {};
 const byId = (id) => document.getElementById(id);
@@ -14,6 +15,9 @@ let collectionController = null;
 let catalog;
 let strategy;
 let searchad;
+let workspace;
+let member = null;
+let memberReady = false;
 let sessionVersion = 0;
 let refreshSchedule = null;
 let refreshViewVersion = 0;
@@ -53,6 +57,7 @@ async function onSessionChanged(nextSession) {
   const version = ++sessionVersion;
   const changedUser = session?.user.id !== nextSession?.user.id;
   session = nextSession;
+  if (changedUser) { member = null; memberReady = false; }
   showPage();
   if (changedUser) {
     profiles.clear();
@@ -68,6 +73,7 @@ async function onSessionChanged(nextSession) {
     showView('auth');
     void catalog?.setContext(null, null);
     void strategy?.setContext(null, null);
+    await workspace?.setUser(null);
     return;
   }
   showView('app');
@@ -75,6 +81,8 @@ async function onSessionChanged(nextSession) {
   void catalog?.setContext(session.user, profiles.get(activeId) || null);
   void strategy?.setContext(session.user, profiles.get(activeId) || null, { loading: !profiles.has(activeId) });
   void searchad?.status();
+  await workspace?.setUser(session.user);
+  if (version !== sessionVersion) return;
   await loadProfiles(version);
 }
 
@@ -414,6 +422,9 @@ async function initialize() {
   });
   catalog = createCatalog(supabase);
   strategy = createStrategy(supabase);
+  workspace = createBloggerWorkspace(supabase, { onMemberChange(next, ready = true) {
+    member = next; memberReady = ready; showPage();
+  } });
   searchad = connectSearchAd(supabase, () => strategy.refresh());
   void catalog.initialize();
   await loadRefreshSchedule();
@@ -441,15 +452,22 @@ for (const id of ['searchInput', 'rankFilter', 'sortSelect']) byId(id).addEventL
 initialize();
 
 function showPage() {
+  const routes = ['strategyView','catalogView','mySpace','catalogAdmin','accountView','bloggerView','keywordSearchView','savedKeywordsView','plannerView'];
   const hash = location.hash.slice(1);
-  const requestedPage = ['strategyView','catalogView','mySpace','catalogAdmin'].includes(hash) ? hash : 'strategyView';
-  const page = !session && requestedPage !== 'catalogView' ? 'authView' : requestedPage;
+  let page = routes.includes(hash) ? hash : 'strategyView';
+  if (!session) page = page === 'catalogView' ? page : 'authView';
+  else if (page !== 'catalogView' && (!memberReady || !member)) page = 'accountView';
+  else if (page === 'strategyView' || page === 'bloggerView') page = member?.mode === 'blogger' ? 'bloggerView' : 'strategyView';
+  else if (page === 'mySpace' && member?.mode !== 'influencer') page = 'accountView';
   document.body.dataset.page = page;
+  byId('collectionNav').hidden = !session || member?.mode !== 'influencer';
+  for (const id of ['accountView','bloggerView','keywordSearchView','savedKeywordsView','plannerView']) byId(id).hidden = page !== id;
   document.querySelectorAll('.section-nav a').forEach(link => {
-    const active = link.getAttribute('href') === `#${page}`;
+    const active = link.getAttribute('href') === `#${page === 'bloggerView' ? 'strategyView' : page}`;
     link.classList.toggle('active', active);
     if (active) link.setAttribute('aria-current','page'); else link.removeAttribute('aria-current');
   });
+  workspace?.show(page);
 }
 window.addEventListener('hashchange', () => { showPage(); window.scrollTo({ top: 0, behavior: 'instant' }); });
 showPage();

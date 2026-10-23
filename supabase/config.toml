@@ -10,3 +10,6 @@ verify_jwt = false
 
 [functions.keychallenge-searchad]
 verify_jwt = true
+
+[functions.keychallenge-keyword-search]
+verify_jwt = true
