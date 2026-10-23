@@ -70,6 +70,7 @@ Deno.serve(async (request: Request) => {
   try {
     const client = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_ANON_KEY')!, {
       auth: { persistSession: false, autoRefreshToken: false },
+      global: { headers: { Authorization: auth } },
     });
     const { data, error } = await client.auth.getUser(auth.slice(7));
     if (error || !data.user) return json(401, { error: '로그인이 만료되었습니다. 다시 로그인해 주세요.' });
@@ -82,6 +83,11 @@ Deno.serve(async (request: Request) => {
     const cursor = body?.cursor == null ? null : String(body.cursor);
     if (!/^[a-z0-9][a-z0-9_.-]{0,99}$/.test(id) || (cursor !== null && !/^\d{1,30}$/.test(cursor))) {
       return json(400, { error: '인플루언서 아이디를 확인해 주세요.' });
+    }
+    if (cursor === null) {
+      const membership = await client.rpc('keychallenge_membership', { p_action: 'can_connect', p_input: { influencer_id: id } });
+      if (membership.error) return json(503, { error: '이용 한도를 확인하지 못했습니다. 잠시 후 다시 시도해 주세요.' });
+      if (!membership.data?.allowed) return json(403, { error: '연결 가능한 인플홈 한도에 도달했습니다. 내 이용 등급에서 한도를 확인해 주세요.' });
     }
     const space = await sourceJson(`https://gw.in.naver.com/home/api/v1/space-by-url-id?urlId=${encodeURIComponent(id)}`);
     if (String(space.urlId).toLowerCase() !== id || !Number.isSafeInteger(space.ownerId) || space.ownerId <= 0) {

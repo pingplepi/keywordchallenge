@@ -2,6 +2,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { createCatalog } from './catalog.js';
 import { createStrategy, connectSearchAd } from './strategy.js';
 import { createBloggerWorkspace } from './blogger.js';
+import { createMembershipManager } from './membership.js';
 
 const config = window.APP_CONFIG || {};
 const byId = (id) => document.getElementById(id);
@@ -16,6 +17,7 @@ let catalog;
 let strategy;
 let searchad;
 let workspace;
+let membership;
 let member = null;
 let memberReady = false;
 let sessionVersion = 0;
@@ -57,6 +59,7 @@ async function onSessionChanged(nextSession) {
   const version = ++sessionVersion;
   const changedUser = session?.user.id !== nextSession?.user.id;
   session = nextSession;
+  void membership?.setUser(session?.user || null);
   if (changedUser) { member = null; memberReady = false; }
   showPage();
   if (changedUser) {
@@ -422,6 +425,7 @@ async function initialize() {
   });
   catalog = createCatalog(supabase);
   strategy = createStrategy(supabase);
+  membership = createMembershipManager(supabase);
   workspace = createBloggerWorkspace(supabase, { onMemberChange(next, ready = true) {
     member = next; memberReady = ready; showPage();
   } });
@@ -452,22 +456,23 @@ for (const id of ['searchInput', 'rankFilter', 'sortSelect']) byId(id).addEventL
 initialize();
 
 function showPage() {
-  const routes = ['strategyView','catalogView','mySpace','catalogAdmin','accountView','bloggerView','keywordSearchView','savedKeywordsView','plannerView'];
+  const routes = ['strategyView','catalogView','mySpace','catalogAdmin','accountView','bloggerView','keywordSearchView','savedKeywordsView','plannerView','memberAdmin','membershipView'];
   const hash = location.hash.slice(1);
   let page = routes.includes(hash) ? hash : 'strategyView';
   if (!session) page = page === 'catalogView' ? page : 'authView';
-  else if (page !== 'catalogView' && (!memberReady || !member)) page = 'accountView';
+  else if (!['catalogView','memberAdmin','membershipView'].includes(page) && (!memberReady || !member)) page = 'accountView';
   else if (page === 'strategyView' || page === 'bloggerView') page = member?.mode === 'blogger' ? 'bloggerView' : 'strategyView';
   else if (page === 'mySpace' && member?.mode !== 'influencer') page = 'accountView';
   document.body.dataset.page = page;
   byId('collectionNav').hidden = !session || member?.mode !== 'influencer';
-  for (const id of ['accountView','bloggerView','keywordSearchView','savedKeywordsView','plannerView']) byId(id).hidden = page !== id;
+  for (const id of ['accountView','bloggerView','keywordSearchView','savedKeywordsView','plannerView','memberAdmin','membershipView']) byId(id).hidden = page !== id;
   document.querySelectorAll('.section-nav a').forEach(link => {
     const active = link.getAttribute('href') === `#${page === 'bloggerView' ? 'strategyView' : page}`;
     link.classList.toggle('active', active);
     if (active) link.setAttribute('aria-current','page'); else link.removeAttribute('aria-current');
   });
   workspace?.show(page);
+  membership?.show(page);
 }
 window.addEventListener('hashchange', () => { showPage(); window.scrollTo({ top: 0, behavior: 'instant' }); });
 showPage();

@@ -8,17 +8,20 @@
     <meta name="description" content="일반 블로거의 키워드 탐색과 발행 계획, 네이버 인플루언서의 키워드 챌린지 현황을 한곳에서 관리하세요." />
     <link rel="stylesheet" href="/styles.css" />
     <link rel="stylesheet" href="/blogger.css" />
+    <link rel="stylesheet" href="/membership.css" />
   </head>
   <body>
     <main class="shell">
       <header class="topbar">
         <a class="brand" href="/"><span class="brand-mark">K</span><span>키워드 챌린지 대시보드</span></a>
         <div class="account" id="accountBar" hidden>
-          <span id="adminBadge" class="status-pill" hidden>관리자</span><span id="accountEmail" class="muted"></span>
+          <span id="adminBadge" class="status-pill" hidden>관리자</span><span id="accountEmail" class="muted"></span><a id="membershipBadge" class="status-pill membership-badge" href="#membershipView" hidden>이용 등급</a>
           <button id="signOutButton" class="button button-quiet" type="button">로그아웃</button>
         </div>
       </header>
-      <nav class="section-nav" aria-label="대시보드 메뉴"><a href="#strategyView">대시보드</a><a href="#keywordSearchView">키워드 검색</a><a href="#savedKeywordsView">보관함</a><a href="#plannerView">발행 계획</a><a href="#catalogView">전체 키챌 목록</a><a id="collectionNav" href="#mySpace" hidden>수집·예약 관리</a><a href="#accountView">내 설정</a><a id="adminNav" href="#catalogAdmin" hidden>관리자 설정</a></nav>
+      <nav class="section-nav" aria-label="대시보드 메뉴"><a href="#strategyView">대시보드</a><a href="#keywordSearchView">키워드 검색</a><a href="#savedKeywordsView">보관함</a><a href="#plannerView">발행 계획</a><a href="#catalogView">전체 키챌 목록</a><a id="collectionNav" href="#mySpace" hidden>수집·예약 관리</a><a href="#accountView">내 설정</a><a id="memberAdminNav" href="#memberAdmin" hidden>회원 관리</a><a id="adminNav" href="#catalogAdmin" hidden>관리자 설정</a></nav>
+      <section id="memberAdmin" hidden aria-label="회원 관리"></section>
+      <section id="membershipView" hidden aria-label="내 이용 등급"></section>
       <section id="accountView" hidden aria-label="내 작업 공간 설정"></section>
       <section id="bloggerView" hidden aria-label="블로그 대시보드"></section>
       <section id="keywordSearchView" hidden aria-label="키워드 검색"></section>

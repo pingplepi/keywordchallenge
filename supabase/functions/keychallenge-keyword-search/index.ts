@@ -23,7 +23,7 @@ Deno.serve(async request => {
     if (cached && Date.parse(cached.collected_at) > Date.now()-30*86400000) return reply(200,{query,items:cached.items,collected_at:cached.collected_at,cached:true});
     const settings = await checked(db.from('keychallenge_searchad_status').select('configured,enabled').eq('singleton',true).single());
     if (!settings.configured || !settings.enabled) return reply(503,{error:'검색량 연결이 잠시 중지되어 있습니다. 키워드는 보관함에 직접 저장할 수 있습니다.'});
-    if (!await checked(db.rpc('keychallenge_claim_keyword_lookup',{p_user_id:auth.user.id}))) return reply(429,{error:'새 검색량 조회는 분당 10회, 하루 100회까지 가능합니다. 잠시 후 다시 검색해 주세요.'});
+    if (!await checked(db.rpc('keychallenge_claim_keyword_lookup',{p_user_id:auth.user.id}))) return reply(429,{error:'현재 등급의 하루 검색 한도 또는 분당 10회 조회 한도에 도달했습니다. 내 이용 등급에서 오늘의 사용량을 확인해 주세요.'});
     const credentials = await checked(db.rpc('keychallenge_searchad_credentials'));
     if (!credentials) return reply(503,{error:'관리자가 검색량 연결을 완료해야 합니다.'});
     const fetched = await fetchVolumes(credentials,[query]);
