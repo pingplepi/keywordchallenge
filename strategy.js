@@ -82,7 +82,12 @@ export function createStrategy(client) {
       if(v!==version)return;if(error)throw error;
       data=response;render();$('detailField').value=data.field;page=1;
       if($('strategyDetails').open)await search();
-    }catch(error){if(v===version){$('strategyError').textContent=`대시보드를 불러오지 못했습니다: ${error.message}`;$('strategyError').hidden=false;}}
+    }catch(error){if(v===version){
+      $('strategyError').textContent=error.code==='57014'||/statement timeout/i.test(error.message||'')
+        ?'대시보드 조회가 지연되고 있습니다. 잠시 후 새로고침을 눌러 주세요.'
+        :`대시보드를 불러오지 못했습니다: ${error.message}`;
+      $('strategyError').hidden=false;
+    }}
     finally{if(v===version)$('strategyRefresh').disabled=false;}
   }
   async function search() {
