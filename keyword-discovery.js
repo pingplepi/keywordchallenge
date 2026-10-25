@@ -14,23 +14,87 @@ const range=(a,b)=>a==null?'미확인':a===b?num(a):num(a)+'–'+num(b);
 const date=v=>v?new Date(v).toLocaleDateString('ko-KR',{timeZone:'Asia/Seoul',month:'numeric',day:'numeric'}):'미확인';
 const key=v=>v.replace(/\s/g,'').toUpperCase();
 const topics={
-  '여행':{'국내여행':['국내여행','제주여행','서울여행'],'세계여행':['해외여행','일본여행','동남아여행'],'베트남·나트랑':['베트남여행','나트랑여행','나트랑마사지'],'일본':['일본여행','오사카여행','후쿠오카여행'],'제주':['제주여행','제주맛집','제주숙소']},
-  '뷰티':{'스킨케어':['스킨케어','선크림','수분크림'],'메이크업':['메이크업','쿠션팩트','립틴트'],'헤어':['헤어케어','샴푸','헤어스타일']},
-  '패션':{'코디':['데일리룩','여성코디','남성코디'],'패션 아이템':['운동화','가방','액세서리']},
-  '푸드':{'집밥':['집밥메뉴','반찬','레시피'],'베이킹':['홈베이킹','쿠키만들기','빵만들기'],'외식':['맛집추천','브런치','카페추천']},
-  '리빙':{'살림':['청소','수납정리','생활용품'],'인테리어':['인테리어','가구','집꾸미기']},
-  '육아':{'육아 생활':['육아용품','이유식','아기장난감'],'아이와 함께':['아이랑가볼만한곳','키즈카페','육아놀이']},
-  'IT테크':{'디지털 기기':['스마트폰','노트북','태블릿'],'생활 기술':['스마트워치','무선이어폰','AI활용']},
-  '자동차':{'차량 선택':['전기차','중고차','패밀리카'],'차량 관리':['자동차용품','세차','타이어']},
-  '경제/비즈니스':{'생활 경제':['적금','연말정산','가계부'],'사업':['창업','마케팅','스마트스토어']},
-  '생활건강':{'건강 습관':['건강관리','스트레칭','수면'],'식생활':['건강식단','영양제','단백질']},
-  '운동/레저':{'운동':['러닝','헬스','필라테스'],'아웃도어':['등산','캠핑','자전거']},
-  '도서':{'책과 독서':['책추천','독서','독서모임']},
-  '문화/예술':{'문화생활':['전시회','뮤지컬','공연']},
-  '게임':{'게임':['모바일게임','PC게임','콘솔게임']},
-  '동물/펫':{'반려동물':['강아지용품','고양이용품','반려동물']},
-  '어학/교육':{'공부':['영어공부','자격증','학습법']},
-  '직접 입력':{'내 주제':[]}
+  "여행": [
+    "국내여행",
+    "해외여행",
+    "여행준비"
+  ],
+  "뷰티": [
+    "스킨케어",
+    "메이크업",
+    "헤어케어"
+  ],
+  "패션": [
+    "여성패션",
+    "남성패션",
+    "패션잡화"
+  ],
+  "푸드": [
+    "레시피",
+    "맛집",
+    "카페"
+  ],
+  "리빙": [
+    "살림",
+    "인테리어",
+    "생활용품"
+  ],
+  "육아": [
+    "육아용품",
+    "육아놀이",
+    "아이랑가볼만한곳"
+  ],
+  "IT테크": [
+    "스마트폰",
+    "노트북",
+    "AI활용"
+  ],
+  "자동차": [
+    "전기차",
+    "중고차",
+    "자동차용품"
+  ],
+  "경제/비즈니스": [
+    "생활경제",
+    "창업",
+    "마케팅"
+  ],
+  "생활건강": [
+    "건강관리",
+    "건강식단",
+    "수면"
+  ],
+  "운동/레저": [
+    "운동",
+    "등산",
+    "캠핑"
+  ],
+  "도서": [
+    "책추천",
+    "독서",
+    "독서모임"
+  ],
+  "문화/예술": [
+    "전시회",
+    "뮤지컬",
+    "공연"
+  ],
+  "게임": [
+    "모바일게임",
+    "PC게임",
+    "콘솔게임"
+  ],
+  "동물/펫": [
+    "강아지용품",
+    "고양이용품",
+    "반려동물"
+  ],
+  "어학/교육": [
+    "영어공부",
+    "자격증",
+    "학습법"
+  ],
+  "직접 입력": []
 };
 export function createTopicDiscovery(client,{root,onSaved=()=>{}}){
   let user=null,settings=null,epoch=0,sequence=0,controller=null,all=[],titles=[],postCount=0,tab='personal',visible=false;
@@ -41,7 +105,7 @@ export function createTopicDiscovery(client,{root,onSaved=()=>{}}){
   nav.innerHTML=methods.map(([id,label,button,panel])=>'<button type="button" role="tab" id="'+button+'" aria-controls="'+panel+'" aria-selected="'+(id===tab)+'" tabindex="'+(id===tab?0:-1)+'" data-discovery-tab="'+id+'">'+label+'</button>').join('');
   const directPanel=document.createElement('div');directPanel.id='directKeywordPanel';directPanel.setAttribute('role','tabpanel');directPanel.setAttribute('aria-labelledby','directKeywordTab');direct.forEach(el=>directPanel.append(el));root.append(nav,directPanel);
   const panel=document.createElement('section');panel.id='topicKeywordPanel';panel.className='panel work-panel topic-discovery';panel.hidden=true;panel.setAttribute('role','tabpanel');panel.setAttribute('aria-labelledby','topicKeywordTab');
-  panel.innerHTML='<h2>주제별 인기 키워드 TOP 20</h2><p class="muted">관심 주제를 고르고, 검색량이 높은 연관 키워드를 찾아보세요.</p><form data-topic-form><div class="work-filters"><label>분야<select data-topic-field>'+Object.keys(topics).map(x=>'<option>'+esc(x)+'</option>').join('')+'</select></label><label>세부 주제<select data-topic-subject></select></label></div><label>대표 키워드 · 최대 3개<input data-topic-seeds maxlength="100" required placeholder="예: 나트랑여행, 나트랑마사지, 나트랑숙소" /></label><p class="muted small">쉼표로 구분해 수정할 수 있습니다. 각 키워드는 30자 이내로 입력해 주세요.</p><button class="button" data-topic-submit>인기 키워드 찾기</button></form><p class="catalog-footnote">대표 키워드별 검색광고 연관어를 합쳐 중복을 제거합니다. 주제 전체의 검색 순위는 아니며, 최근 30일 안에 조회한 결과는 함께 재사용합니다. 새 조회는 최대 3회이며 기존 키워드 검색 한도를 적용합니다.</p><p class="message" data-topic-status role="status">주제를 선택한 뒤 버튼을 눌러 주세요.</p><div data-topic-result hidden><div class="work-filters"><label>결과 안에서 찾기<input data-topic-filter type="search" maxlength="100" placeholder="예: 숙소" /></label><label class="topic-toggle"><input type="checkbox" data-topic-new checked />최근 글 제목에 없는 키워드 우선</label></div><p class="muted small" data-topic-summary></p><div class="opportunity-grid" data-topic-cards></div></div>';
+  panel.innerHTML='<h2>주제별 인기 키워드 TOP 20</h2><p class="muted">관심 분야와 원하는 키워드로 검색량이 높은 연관 키워드를 찾아보세요.</p><form data-topic-form><div class="work-filters"><label>분야<select data-topic-field>'+Object.keys(topics).map(x=>'<option>'+esc(x)+'</option>').join('')+'</select></label></div><label>대표 키워드 · 최대 3개<input data-topic-seeds maxlength="100" required placeholder="예: 나트랑여행, 나트랑마사지, 나트랑숙소" /></label><p class="muted small">분야별 예시는 자유롭게 바꿀 수 있습니다. 원하는 키워드를 쉼표로 구분해, 각각 30자 이내로 입력해 주세요.</p><button class="button" data-topic-submit>인기 키워드 찾기</button></form><p class="catalog-footnote">대표 키워드별 검색광고 연관어를 합쳐 중복을 제거합니다. 주제 전체의 검색 순위는 아니며, 최근 30일 안에 조회한 결과는 함께 재사용합니다. 기본·플러스 등급의 일일 조회 한도는 없으며, 짧은 시간의 연속 요청만 제한합니다.</p><p class="message" data-topic-status role="status">주제를 선택한 뒤 버튼을 눌러 주세요.</p><div data-topic-result hidden><div class="work-filters"><label>결과 안에서 찾기<input data-topic-filter type="search" maxlength="100" placeholder="예: 숙소" /></label><label class="topic-toggle"><input type="checkbox" data-topic-new checked />최근 글 제목에 없는 키워드 우선</label></div><p class="muted small" data-topic-summary></p><div class="opportunity-grid" data-topic-cards></div></div>';
   root.append(panel);const $=s=>panel.querySelector(s);
   const personalPanel=document.createElement('section');personalPanel.id='personalKeywordPanel';personalPanel.className='panel work-panel';personalPanel.setAttribute('role','tabpanel');personalPanel.setAttribute('aria-labelledby','personalKeywordTab');
   const opportunityPanel=document.createElement('div');opportunityPanel.id='opportunitiesKeywordPanel';opportunityPanel.setAttribute('role','tabpanel');opportunityPanel.setAttribute('aria-labelledby','opportunitiesKeywordTab');root.append(personalPanel,opportunityPanel);
@@ -65,9 +129,8 @@ export function createTopicDiscovery(client,{root,onSaved=()=>{}}){
   nav.addEventListener('keydown',e=>{if(!['ArrowLeft','ArrowRight','Home','End'].includes(e.key))return;e.preventDefault();const i=methods.findIndex(([id])=>id===tab);const next=e.key==='Home'?0:e.key==='End'?methods.length-1:(i+(e.key==='ArrowRight'?1:-1)+methods.length)%methods.length;choose(methods[next][0],true);});
   document.addEventListener('click',e=>{const link=e.target.closest('[data-keyword-discovery-target]');if(link)choose(link.dataset.keywordDiscoveryTarget);});
   choose('personal');
-  function seeds(){ $('[data-topic-seeds]').value=topics[$('[data-topic-field]').value][$('[data-topic-subject]').value].join(', '); }
-  function subjects(){const v=$('[data-topic-field]').value;$('[data-topic-subject]').innerHTML=Object.keys(topics[v]).map(x=>'<option>'+esc(x)+'</option>').join('');seeds();}
-  $('[data-topic-field]').addEventListener('change',subjects);$('[data-topic-subject]').addEventListener('change',seeds);subjects();
+  function seeds(){ $('[data-topic-seeds]').value=topics[$('[data-topic-field]').value].join(', '); }
+  $('[data-topic-field]').addEventListener('change',seeds);seeds();
   function render(){
     const filter=key($('[data-topic-filter]').value),prefer=$('[data-topic-new]').checked;
     const candidates=all.filter(r=>r.available&&r.volume_min!=null&&key(r.keyword).includes(filter)).map(r=>({...r,matched:postCount?titles.some(t=>t.includes(r.keyword_key)):null}));
@@ -88,7 +151,7 @@ export function createTopicDiscovery(client,{root,onSaved=()=>{}}){
       if(settings?.blog_id){const posts=await client.from('keychallenge_blog_posts').select('title').eq('user_id',user.id).eq('blog_id',settings.blog_id).order('published_at',{ascending:false,nullsFirst:false}).order('first_seen_at',{ascending:false}).limit(50);if(g!==epoch||v!==sequence)return;if(posts.error)throw Error('최근 글을 비교하지 못했습니다. 잠시 후 다시 시도해 주세요.');titles=(posts.data||[]).map(p=>key(p.title));postCount=titles.length;}
       for(const hint of hints){
         if(g!==epoch||v!==sequence)return;
-        const response=await fetch(window.APP_CONFIG.SUPABASE_URL+'/functions/v1/keychallenge-keyword-search',{method:'POST',signal:controller.signal,headers:{apikey:window.APP_CONFIG.SUPABASE_ANON_KEY,Authorization:'Bearer '+session.access_token,'Content-Type':'application/json'},body:JSON.stringify({query:hint})});
+        const response=await fetch(window.APP_CONFIG.SUPABASE_URL+'/functions/v1/keychallenge-keyword-search',{method:'POST',signal:controller.signal,headers:{apikey:window.APP_CONFIG.SUPABASE_ANON_KEY,Authorization:'Bearer '+session.access_token,'Content-Type':'application/json'},body:JSON.stringify({query:hint,sort:'volume'})});
         const result=await response.json();if(g!==epoch||v!==sequence)return;
         if(!response.ok){failures.push(hint+': '+(result.error||'조회 실패'));if([401,403,429,503].includes(response.status))break;continue;}
         completed++;for(const item of result.items||[]){const old=merged.get(item.keyword_key);if(!old)merged.set(item.keyword_key,{...item,collected_at:item.collected_at||result.collected_at,seeds:[hint]});else{old.seeds.push(hint);if(Date.parse(item.collected_at)>Date.parse(old.collected_at))Object.assign(old,item);}}
@@ -99,11 +162,11 @@ export function createTopicDiscovery(client,{root,onSaved=()=>{}}){
     finally{if(g===epoch&&v===sequence)$('[data-topic-submit]').disabled=false;}
   });
   panel.addEventListener('click',async e=>{const b=e.target.closest('[data-topic-save]');if(!b||b.disabled||!user)return;const row=all.find(r=>r.keyword_key===b.dataset.topicSave);if(!row)return;const g=epoch;b.disabled=true;try{const result=await client.rpc('keychallenge_save_blog_keyword',{p_keyword:row.keyword});if(g!==epoch)return;if(result.error)throw result.error;saved.add(row.keyword_key);render();onSaved();}catch(error){if(g===epoch){b.disabled=false;$('[data-topic-status]').textContent=error.message||'보관하지 못했습니다.';}}});
-  return {direct:()=>choose('direct'),show(page){visible=page==='keywordSearchView';sync();},setContext(next,nextSettings){epoch++;sequence++;controller?.abort();user=next;settings=nextSettings;all=[];titles=[];postCount=0;saved.clear();$('[data-topic-result]').hidden=true;$('[data-topic-submit]').disabled=false;$('[data-topic-status]').textContent='주제를 선택한 뒤 버튼을 눌러 주세요.';$('[data-topic-field]').value=Object.hasOwn(topics,settings?.interest)?settings.interest:'여행';subjects();choose('personal');}};
+  return {direct:()=>choose('direct'),show(page){visible=page==='keywordSearchView';sync();},setContext(next,nextSettings){epoch++;sequence++;controller?.abort();user=next;settings=nextSettings;all=[];titles=[];postCount=0;saved.clear();$('[data-topic-result]').hidden=true;$('[data-topic-submit]').disabled=false;$('[data-topic-status]').textContent='주제를 선택한 뒤 버튼을 눌러 주세요.';$('[data-topic-field]').value=Object.hasOwn(topics,settings?.interest)?settings.interest:'여행';seeds();choose('personal');}};
 }
 export function createPersonalKeywords(client,{root,onSaved=()=>{}}){
   let user=null,profile=null,epoch=0,request=0,data=null,loading=false,loadedAt=0;const saved=new Set();
-  root.className='personal-keywords';root.innerHTML='<div class="section-heading"><div><p class="eyebrow">PERSONAL KEYWORDS</p><h2>나에게 맞는 키워드</h2><p class="muted">성과 기록과 최근 글의 주제를 바탕으로 다음 글감을 찾아보세요.</p></div><button class="button button-light" data-personal-refresh>추천 새로고침</button></div><p class="message" role="status" data-personal-status></p><div data-personal-basis></div><div class="opportunity-grid" data-personal-cards></div><details class="score-note opportunity-method"><summary>맞춤 추천 기준과 데이터 범위</summary><p>최근 30일 안의 인플홈 수집과 최대 7개 날짜의 순위 기록에서 TOP10 키챌을 찾습니다. 이는 키워드 챌린지 순위이며 블로그 통합검색 순위가 아닙니다.</p><p>해당 키챌에 등록한 글과 최근 수집한 글 최대 50편의 제목에서 반복되는 표현을 비교합니다. 블로그의 노출 확인은 글 제목 검색 결과로, 특정 키워드의 상위 노출을 뜻하지 않습니다.</p><p>관심 분야의 최근 30일 검색량이 있는 키챌 목록에서 관련 후보를 찾고, 수집한 글 제목과 참여 목록에 이미 있는 키워드는 제외합니다. 연결 표현·확인 기록·키챌 참여자 대비 수요를 참고한 확장 추천이며, 노출 가능성을 보장하거나 점수로 예측하지 않습니다. 본문과 과거 전체 글을 비교한 결과는 아닙니다.</p><p>저장된 데이터만 사용하므로 검색 노출 점검 횟수와 검색광고 새 조회 한도를 차감하지 않습니다.</p></details>';
+  root.className='personal-keywords';root.innerHTML='<div class="section-heading"><div><p class="eyebrow">PERSONAL KEYWORDS</p><h2>나에게 맞는 키워드</h2><p class="muted">성과 기록과 최근 글의 주제를 바탕으로 다음 글감을 찾아보세요.</p></div><button class="button button-light" data-personal-refresh>추천 새로고침</button></div><p class="message" role="status" data-personal-status></p><div data-personal-basis></div><div class="opportunity-grid" data-personal-cards></div><details class="score-note opportunity-method"><summary>맞춤 추천 기준과 데이터 범위</summary><p>최근 30일 안의 인플홈 수집과 최대 7개 날짜의 순위 기록에서 TOP10 키챌을 찾습니다. 이는 키워드 챌린지 순위이며 블로그 통합검색 순위가 아닙니다.</p><p>해당 키챌에 등록한 글과 최근 수집한 글 최대 50편의 제목에서 반복되는 표현을 비교합니다. 블로그의 노출 확인은 글 제목 검색 결과로, 특정 키워드의 상위 노출을 뜻하지 않습니다.</p><p>관심 분야의 최근 30일 검색량이 있는 키챌 목록에서 관련 후보를 찾고, 수집한 글 제목과 참여 목록에 이미 있는 키워드는 제외합니다. 연결 표현·확인 기록·키챌 참여자 대비 수요를 참고한 확장 추천이며, 노출 가능성을 보장하거나 점수로 예측하지 않습니다. 본문과 과거 전체 글을 비교한 결과는 아닙니다.</p><p>저장된 데이터만 사용하므로 검색 노출 점검 횟수를 차감하거나 검색광고 API를 새로 호출하지 않습니다.</p></details>';
   const $=s=>root.querySelector(s);
   function render(){if(!data)return;
     $('[data-personal-basis]').innerHTML='<p class="opportunity-summary">'+esc(data.field||'관심 분야 미설정')+' · 최근 글 '+num(data.post_count)+'편 · 연결 후보 '+num(data.candidate_count)+'개</p>'+(data.strengths.length?'<div class="personal-evidence"><h3>좋은 순위가 확인된 키챌</h3><p class="muted small">'+(data.history_days?date(data.history_start)+'~'+date(data.history_end)+' · '+num(data.history_days)+'개 날짜 기록과 최근 수집 비교':'최근 인플홈 수집 기준')+' · 키챌 순위</p><ul>'+data.strengths.map(s=>'<li><strong>'+esc(s.keyword)+'</strong><span>기간 내 최고 '+num(s.best_rank)+'위 · 최근 '+(s.current_rank?num(s.current_rank)+'위':'미확인')+'</span></li>').join('')+'</ul></div>':'<p class="analysis-note">최근 키챌 TOP10 기록이 없어, 최근 글의 주제와 제목 검색 노출 확인 기록으로 추천합니다.</p>')+(data.exposed_posts?'<p class="muted small">최근 제목 검색으로 노출 확인된 글 '+num(data.exposed_posts)+'편을 참고했습니다.</p>':'');
