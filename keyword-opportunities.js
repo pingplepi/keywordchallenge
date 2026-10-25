@@ -1,4 +1,4 @@
-import { createPersonalKeywords } from './keyword-discovery.js';
+import { createPersonalKeywords, mountKeywordRecommendations } from './keyword-discovery.js';
 const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const number = value => Number(value || 0).toLocaleString('ko-KR');
 const date = value => value ? new Date(value).toLocaleDateString('ko-KR',{timeZone:'Asia/Seoul',month:'numeric',day:'numeric'}) : '미확인';
@@ -11,8 +11,7 @@ const kinds = [
 
 export function createKeywordOpportunities(client, {remember=()=>{},onDetail,onSaved=()=>{},rootId='strategyOpportunities',mode='influencer'}) {
   const root = document.getElementById(rootId),blogger=mode==='blogger';
-  const targetPage=blogger?'bloggerView':'strategyView';
-  let contextKey='',pendingField=null;
+  let contextKey='',pendingField=null,recommendationTab=null,loadedAt=0;
   root.classList.add('keyword-opportunities');
   let user=null,profile=null,context=0,request=0,active='blue',data=null,field='__mine__',loading=false,saveRevision=0,visible=false;
   const rows=new Map(),saving=new Set(),savedOverrides=new Map();
@@ -54,7 +53,7 @@ export function createKeywordOpportunities(client, {remember=()=>{},onDetail,onS
     }).join(''):blogger&&!data.field?'<div class="strategy-empty opportunity-empty">관심 분야를 선택하면 맞춤 키워드를 추천해 드립니다. <a href="#accountView">관심 분야 설정하기 ↗</a></div>':`<div class="strategy-empty opportunity-empty">${data.measured?'이 분야에서 해당 기준을 충족하는 후보가 아직 없습니다. 다른 탭이나 분야를 선택해 보세요.':'추천에 사용할 최신 검색량·참여자 데이터가 아직 충분하지 않습니다. 데이터가 갱신되면 후보가 표시됩니다.'}</div>`;
   }
   async function load(nextField=field) {
-    if(!user||!profile||(blogger&&profile.mode!=='blogger'))return;
+    if(!visible||recommendationTab!=='opportunity'||!user||!profile||(blogger&&profile.mode!=='blogger'))return;
     if(loading){pendingField=nextField;return;}
     const v=++request,g=context,startedAtRevision=saveRevision;field=nextField;loading=true;data=null;rows.clear();
     $('opportunityCards').innerHTML='';$('opportunitySummary').textContent='';
@@ -63,7 +62,7 @@ export function createKeywordOpportunities(client, {remember=()=>{},onDetail,onS
       const result=blogger?await client.rpc('keychallenge_blogger_keyword_opportunities'):await client.rpc('keychallenge_keyword_opportunities',{p_influencer_id:profile.influencerId,p_field:field});
       if(g!==context||v!==request)return;
       if(result.error)throw result.error;
-      data=result.data;
+      data=result.data;loadedAt=Date.now();
       for(const [key,revision] of savedOverrides)if(revision<=startedAtRevision)savedOverrides.delete(key);
       for(const [id] of kinds)for(const row of data[id])rows.set(row.keyword_id,row);
       remember([...rows.values()]);message('');render();
@@ -72,7 +71,7 @@ export function createKeywordOpportunities(client, {remember=()=>{},onDetail,onS
       message('추천을 불러오지 못했습니다. 다시 불러오기를 눌러 주세요.',true);
       $('opportunityCards').innerHTML='<div class="opportunity-empty"><button type="button" class="button button-light" data-opportunity-retry>다시 불러오기</button></div>';
     } finally {
-      if(g===context&&v===request){loading=false;$('opportunityPanel').setAttribute('aria-busy','false');void personal.load();if(pendingField!==null){const next=pendingField;pendingField=null;if(next!==field&&next!==data?.field)void load(next);}}
+      if(g===context&&v===request){loading=false;$('opportunityPanel').setAttribute('aria-busy','false');if(pendingField!==null){const next=pendingField;pendingField=null;if(next!==field&&next!==data?.field)void load(next);}}
     }
   }
   function selectTab(id,focus=false) {
@@ -113,12 +112,15 @@ export function createKeywordOpportunities(client, {remember=()=>{},onDetail,onS
       if(g===context){saving.delete(row.keyword_key);render();}
     }
   });
+  const mounted=mountKeywordRecommendations({root,personalRoot,mode,activate(tab){
+    recommendationTab=tab;visible=tab==='personal'||tab==='opportunity';
+    if(!user||!profile)return;
+    if(tab==='personal')void personal.load(false);
+    if(tab==='opportunity'&&!loading&&(!data||Date.now()-loadedAt>60000))void load('__mine__');
+  }});
   return {
     load,
-    show(page) {
-      const entering=!visible&&page===targetPage;visible=page===targetPage;
-      if(entering&&data&&!loading)void load();
-    },
+    show(){},
     setContext(nextUser,nextProfile) {
       const key=JSON.stringify(blogger?[nextUser?.id,nextProfile?.mode,nextProfile?.blog_id,nextProfile?.interest]:[nextUser?.id,nextProfile?.influencerId]);
       user=nextUser;profile=nextProfile;
@@ -126,7 +128,7 @@ export function createKeywordOpportunities(client, {remember=()=>{},onDetail,onS
       contextKey=key;personal.setContext(user,profile);
       context++;request++;data=null;loading=false;pendingField=null;active='blue';field='__mine__';
       rows.clear();saving.clear();savedOverrides.clear();
-      $('opportunityCards').innerHTML='';$('opportunitySummary').textContent='';message('');syncTabs();
+      $('opportunityCards').innerHTML='';$('opportunitySummary').textContent='';message('');syncTabs();mounted.refresh();
     }
   };
 }
