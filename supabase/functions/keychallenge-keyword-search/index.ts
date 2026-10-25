@@ -22,7 +22,7 @@ Deno.serve(async request => {
     const key = keywordKey(query);
     const sort = body.sort === 'volume' ? 'volume' : 'relevance';
     const cached = await checked(db.from('keychallenge_keyword_lookup_cache').select('items,collected_at,format_version').eq('keyword_key',key).maybeSingle());
-    if (cached?.format_version === 2 && Date.parse(cached.collected_at) > Date.now()-30*86400000) return reply(200,{query,items:rankKeywords(query,cached.items,sort).slice(0,200),sort,collected_at:cached.collected_at,cached:true});
+    if (cached?.format_version === 2 && Date.parse(cached.collected_at) > Date.now()-30*86400000) return reply(200,{query,items:rankKeywords(query,cached.items,sort).slice(0,sort === 'volume' ? 200 : 100),sort,collected_at:cached.collected_at,cached:true});
     const settings = await checked(db.from('keychallenge_searchad_status').select('configured,enabled').eq('singleton',true).single());
     if (!settings.configured || !settings.enabled) return reply(503,{error:'검색량 연결이 잠시 중지되어 있습니다. 키워드는 보관함에 직접 저장할 수 있습니다.'});
     if (!await checked(db.rpc('keychallenge_claim_keyword_lookup',{p_user_id:auth.user.id}))) return reply(429,{error:'연속 조회 제한(분당 10회)에 도달했거나 관리자가 설정한 이용 한도에 도달했습니다. 잠시 후 다시 시도하거나 내 이용 등급을 확인해 주세요.'});
@@ -35,7 +35,7 @@ Deno.serve(async request => {
     const stamp = new Date().toISOString();
     const items = rows.map((r:any)=>({...r,volume_min:r.available?r.pc_min+r.mobile_min:null,volume_max:r.available?r.pc_max+r.mobile_max:null}));
     await checked(db.from('keychallenge_keyword_lookup_cache').upsert({keyword_key:key,items,collected_at:stamp,format_version:2},{onConflict:'keyword_key'}));
-    return reply(200,{query,items:rankKeywords(query,items,sort).slice(0,200),sort,collected_at:stamp,cached:false});
+    return reply(200,{query,items:rankKeywords(query,items,sort).slice(0,sort === 'volume' ? 200 : 100),sort,collected_at:stamp,cached:false});
   } catch (error) {
     return reply(error instanceof SearchAdError ? (error.status===429?429:502) : 503,
       {error:error instanceof SearchAdError ? error.message : '검색량을 불러오지 못했습니다. 잠시 후 다시 검색해 주세요.'});
