@@ -1,6 +1,8 @@
 import { createClient } from 'npm:@supabase/supabase-js@2.118.0';
 import { BlogError, SearchStoppedError, recentPosts, searchBlog, postIdentity, titleQueries } from '../_shared/blog.ts';
 
+import { collectBodyMetrics } from '../_shared/blog-metrics.ts';
+
 const db = createClient(Deno.env.get('SUPABASE_URL')!,Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,{auth:{persistSession:false,autoRefreshToken:false}});
 const reply = (status:number,value:unknown) => new Response(JSON.stringify(value),{status,headers:{'Content-Type':'application/json','Cache-Control':'no-store'}});
 async function data(query:any) { const result=await query; if(result.error)throw new Error('Database operation failed'); return result.data; }
@@ -19,6 +21,7 @@ Deno.serve(async req => {
     if(hash!==auth.token_hash)return reply(401,{error:'Unauthorized'});
     const raw=await req.text();if(raw.length>1000)return reply(400,{error:'Invalid request'});
     const body=raw?JSON.parse(raw):{};
+    if(body.kind==='metrics')return reply(200,await collectBodyMetrics(db));
     kind=body.kind==='search'?'search':'rss';
     if(kind==='rss'){
       job=await rssWorker('claim');if(!job)return reply(200,{idle:true});
