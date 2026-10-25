@@ -40,3 +40,20 @@
  .discovery-stats .metric>strong{font-size:var(--font-metric)}
  .discovery-method summary{min-height:44px}
 }
+/* Daily writing brief: one selected guide, shared card and control scale. */
+#bloggerView .discovery-stats{grid-template-columns:repeat(2,minmax(0,1fr))}
+#discoveryWritingGuide{scroll-margin-top:24px}
+.writing-guide-controls{display:grid;grid-template-columns:2fr 1fr;gap:var(--inner-gap,16px);margin-bottom:var(--inner-gap,16px)}
+.writing-guide-controls label{min-width:0}
+.writing-guide-context{padding:18px;background:#f5f1fc;border-radius:12px;margin-bottom:20px;overflow-wrap:anywhere}
+.writing-guide-context>strong{font-size:var(--font-card-title);margin-right:12px}
+.writing-guide-context p{font-size:var(--font-label);line-height:1.8;margin:10px 0 0;color:var(--muted)}
+.writing-guide-block{margin-top:24px;min-width:0}
+.writing-guide-block h3{font-size:var(--font-card-title);margin:0 0 12px}
+.writing-guide-block ol,.writing-guide-block ul{padding-left:22px;margin:0;font-size:var(--font-body);line-height:1.85;overflow-wrap:anywhere}
+.writing-guide-block li+li{margin-top:8px}
+.writing-outline li p{font-size:var(--font-label);color:var(--muted);margin:4px 0 14px}
+.writing-guide-columns{display:grid;grid-template-columns:1fr 1fr;gap:var(--card-gap,24px)}
+.writing-guide textarea{width:100%;padding:14px;font:inherit;font-size:var(--font-label);line-height:1.8;border:1px solid var(--line);border-radius:12px;resize:vertical;box-sizing:border-box}
+.writing-guide [hidden]{display:none}
+@media(max-width:700px){.writing-guide-controls,.writing-guide-columns{grid-template-columns:1fr}.writing-guide .work-section-title>.button{width:100%}.writing-guide-context{padding:16px}}
