@@ -31,4 +31,19 @@
   .opportunity-tabs [role="tab"] { padding:8px 5px; gap:4px; flex-wrap:wrap; font-size:var(--font-caption); }
   .keyword-opportunities .section-heading > .button { margin-top:12px; }
 }
-
+/* Topic and personal recommendations reuse the shared controls and cards. */
+#directKeywordPanel { display:grid; gap:var(--section-gap,24px); }
+#directKeywordPanel[hidden] { display:none; }
+.discovery-search-tabs { margin-bottom:var(--inner-gap); }
+.topic-discovery form { display:grid; gap:var(--inner-gap,16px); }
+.topic-discovery form > .button { justify-self:start; }
+.topic-discovery .topic-toggle { display:flex; align-items:center; gap:10px; align-self:end; min-height:44px; }
+.topic-toggle input[type=checkbox] { width:18px; height:18px; flex:0 0 18px; }
+.topic-device-volume { font-size:var(--font-card-title)!important; }
+.personal-keywords { border-top:1px solid #e5dfee; margin-top:var(--section-gap,28px); padding-top:var(--section-gap,28px); }
+.personal-evidence { padding:18px; border-radius:12px; background:#f5f1fc; margin-bottom:20px; }
+.personal-evidence h3 { margin:0 0 8px; font-size:var(--font-card-title); }
+.personal-evidence ul { list-style:none; padding:0; margin:12px 0 0; display:grid; gap:10px; }
+.personal-evidence li { display:flex; justify-content:space-between; gap:12px; flex-wrap:wrap; font-size:var(--font-label); }
+.personal-evidence li span { color:#756880; font-size:var(--font-caption); }
+@media(max-width:640px) { .discovery-search-tabs { grid-template-columns:repeat(2,minmax(0,1fr)); } .topic-discovery form > .button { width:100%; } .personal-evidence { padding:16px; } }
