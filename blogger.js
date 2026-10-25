@@ -1,4 +1,5 @@
 import { createBloggerDashboard } from './blogger-dashboard.js';
+import { createTopicDiscovery } from './keyword-discovery.js';
 
 const $ = id => document.getElementById(id);
 const esc = value => String(value ?? '').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -21,11 +22,12 @@ export function createBloggerWorkspace(client,{onMemberChange}) {
   let user=null,settings=null,loaded=false,generation=0,savedVersion=0,searchVersion=0;
   let savedPage=1,resultPage=1,results=[],resultQuery='',savedRecords=new Map();
   let toastTimer,searchController,dialogBusy=false;
-  const dashboard=createBloggerDashboard(client,{notify,onSearch(keyword){$('blogSearchQuery').value=keyword;location.hash='keywordSearchView';}});
+  const dashboard=createBloggerDashboard(client,{notify,onSearch(keyword){topicDiscovery.direct();$('blogSearchQuery').value=keyword;location.hash='keywordSearchView';}});
   $('accountView').innerHTML=heading('YOUR WORKSPACE','내 작업 공간 설정','블로그 운영 방식에 맞는 대시보드를 선택하세요.')+'<p class="member-settings-link"><a href="#membershipView">내 이용 등급 · 사용량 보기 ↗</a><a href="/password-reset.html">비밀번호 재설정</a></p><div id="workspaceSettingsBody" class="panel work-panel" aria-live="polite">계정 설정을 불러오고 있습니다…</div>';
   $('keywordSearchView').innerHTML=heading('KEYWORD DISCOVERY','키워드 검색','키워드 챌린지 목록에 없는 검색어도 자유롭게 찾아보세요.')+`
     <section class="panel work-panel"><form id="blogSearchForm" class="work-search-form"><label>검색할 키워드<input id="blogSearchQuery" type="search" maxlength="100" required placeholder="예: 제주 여행, 가을 코디, 집밥 메뉴" /></label><button id="blogSearchSubmit" class="button">검색량 조회</button></form><p class="muted small">네이버 검색광고의 최근 30일 PC·모바일 검색량입니다. ‘10 미만’ 응답은 범위로 표시합니다.</p><p id="blogSearchMessage" class="message" role="status">키워드를 입력하면 관련 키워드도 함께 보여드립니다.</p></section>
     <section id="blogSearchResultsPanel" class="panel work-panel" hidden><div class="work-section-title"><h2 id="blogSearchResultTitle">검색 결과</h2><span id="blogSearchDate" class="muted small"></span></div><div id="blogSearchResults"></div><div class="pagination"><button class="button button-light" data-work-action="result-prev">이전</button><span id="blogResultPage"></span><button class="button button-light" data-work-action="result-next">다음</button></div><p class="catalog-footnote">검색한 키워드를 먼저 표시한 뒤 관련 키워드를 검색량순으로 최대 200개 보여드립니다. 조회 기준일이 30일 이내인 결과는 저장된 데이터를 활용합니다.</p></section>`;
+  const topicDiscovery=createTopicDiscovery(client,{root:$('keywordSearchView'),onSaved:()=>dashboard.invalidate()});
   $('savedKeywordsView').innerHTML=heading('YOUR IDEA LIBRARY','내 키워드 보관함','글감을 모아두고, 폴더와 메모로 정리하세요.','<button class="button" data-work-action="keyword-new">+ 키워드 직접 추가</button>')+`
     <section class="panel work-panel"><div class="work-filters"><label>키워드 찾기<input id="savedQuery" type="search" maxlength="100" placeholder="보관한 키워드 검색" /></label><label>폴더<select id="savedFolder"><option value="">모든 폴더</option></select></label><label>보기<select id="savedArchive"><option value="active">보관 중</option><option value="archived">보관 해제한 키워드</option></select></label></div><div class="work-section-title"><strong id="savedCount" aria-live="polite"></strong><a href="#keywordSearchView">키워드 더 찾기 ↗</a></div><div id="savedRows" class="work-keyword-grid"></div><div class="pagination"><button id="savedPrev" class="button button-light" data-work-action="saved-prev">이전</button><span id="savedPage"></span><button id="savedNext" class="button button-light" data-work-action="saved-next">다음</button></div></section>`;
   const dialog=document.createElement('dialog');dialog.id='workspaceDialog';dialog.className='keyword-dialog work-dialog';document.body.append(dialog);
@@ -40,7 +42,7 @@ export function createBloggerWorkspace(client,{onMemberChange}) {
     $('memberForm').addEventListener('submit',async e=>{e.preventDefault();const g=generation;const mode=$('memberForm').querySelector('input[name="workspaceMode"]:checked').value;$('memberSubmit').disabled=true;try{
       const id=$('memberBlog').value.trim()?blogId($('memberBlog').value):null;
       const row=await checked(client.from('keychallenge_members').upsert({user_id:user.id,mode,blog_id:id,interest:$('memberInterest').value},{onConflict:'user_id'}).select().single());
-      if(g!==generation)return;settings=row;dashboard.setContext(user,settings);onMemberChange(settings);settingsForm();window.location.replace('#strategyView');notify('내 작업 공간을 저장했습니다.');
+      if(g!==generation)return;settings=row;topicDiscovery.setContext(user,settings);dashboard.setContext(user,settings);onMemberChange(settings);settingsForm();window.location.replace('#strategyView');notify('내 작업 공간을 저장했습니다.');
     }catch(error){if(g===generation)$('memberMessage').textContent=error.message;}finally{if(g===generation)$('memberSubmit').disabled=false;}});
   }
   async function loadSaved(){if(!user||!loaded)return;const v=++savedVersion,g=generation;$('savedCount').textContent='불러오는 중…';try{
@@ -89,9 +91,9 @@ export function createBloggerWorkspace(client,{onMemberChange}) {
     if(!force&&loaded&&user?.id===nextUser?.id)return settings;
     const g=++generation;user=nextUser;settings=null;loaded=false;results=[];savedRecords.clear();searchController?.abort();searchVersion++;savedVersion++;clearTimeout(filterTimer);clearTimeout(toastTimer);
     dialogBusy=false;if(dialog.open)dialog.close();$('workspaceToast').hidden=true;$('blogSearchForm').reset();$('blogSearchSubmit').disabled=false;$('blogSearchMessage').textContent='키워드를 입력하면 관련 키워드도 함께 보여드립니다.';$('blogSearchResultsPanel').hidden=true;$('savedQuery').value='';$('savedFolder').innerHTML='<option value="">모든 폴더</option>';$('savedArchive').value='active';savedPage=1;$('savedRows').innerHTML='';
-    dashboard.setContext(user,null);$('workspaceSettingsBody').textContent='계정 설정을 불러오고 있습니다…';
+    topicDiscovery.setContext(user,null);dashboard.setContext(user,null);$('workspaceSettingsBody').textContent='계정 설정을 불러오고 있습니다…';
     if(!user){onMemberChange(null,false);return null;}
-    try{const row=await checked(client.from('keychallenge_members').select('*').eq('user_id',user.id).maybeSingle());if(g!==generation)return null;settings=row;loaded=true;dashboard.setContext(user,settings);settingsForm();onMemberChange(settings,true);return settings;}
+    try{const row=await checked(client.from('keychallenge_members').select('*').eq('user_id',user.id).maybeSingle());if(g!==generation)return null;settings=row;loaded=true;topicDiscovery.setContext(user,settings);dashboard.setContext(user,settings);settingsForm();onMemberChange(settings,true);return settings;}
     catch(error){if(g===generation){$('workspaceSettingsBody').innerHTML='<h2>설정을 불러오지 못했습니다.</h2><p class="muted">잠시 후 다시 불러와 주세요.</p><button class="button" data-work-action="retry-member">다시 불러오기</button>';onMemberChange(null,false);}return null;}
   },show(page){dashboard.show(page);if(!user||!loaded)return;if(page==='savedKeywordsView')void loadSaved();}};
   return api;
