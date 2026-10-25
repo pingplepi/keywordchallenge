@@ -12,7 +12,7 @@ const kinds = [
 export function createKeywordOpportunities(client, {remember=()=>{},onDetail,onSaved=()=>{},rootId='strategyOpportunities',mode='influencer'}) {
   const root = document.getElementById(rootId),blogger=mode==='blogger';
   const targetPage=blogger?'bloggerView':'strategyView';
-  let contextKey='';
+  let contextKey='',pendingField=null;
   root.classList.add('keyword-opportunities');
   let user=null,profile=null,context=0,request=0,active='blue',data=null,field='__mine__',loading=false,saveRevision=0,visible=false;
   const rows=new Map(),saving=new Set(),savedOverrides=new Map();
@@ -55,7 +55,7 @@ export function createKeywordOpportunities(client, {remember=()=>{},onDetail,onS
   }
   async function load(nextField=field) {
     if(!user||!profile||(blogger&&profile.mode!=='blogger'))return;
-    void personal.load();
+    if(loading){pendingField=nextField;return;}
     const v=++request,g=context,startedAtRevision=saveRevision;field=nextField;loading=true;data=null;rows.clear();
     $('opportunityCards').innerHTML='';$('opportunitySummary').textContent='';
     syncTabs();$('opportunityPanel').setAttribute('aria-busy','true');message('저장된 데이터에서 추천 후보를 찾고 있어요…');
@@ -72,7 +72,7 @@ export function createKeywordOpportunities(client, {remember=()=>{},onDetail,onS
       message('추천을 불러오지 못했습니다. 다시 불러오기를 눌러 주세요.',true);
       $('opportunityCards').innerHTML='<div class="opportunity-empty"><button type="button" class="button button-light" data-opportunity-retry>다시 불러오기</button></div>';
     } finally {
-      if(g===context&&v===request){loading=false;$('opportunityPanel').setAttribute('aria-busy','false');}
+      if(g===context&&v===request){loading=false;$('opportunityPanel').setAttribute('aria-busy','false');void personal.load();if(pendingField!==null){const next=pendingField;pendingField=null;if(next!==field&&next!==data?.field)void load(next);}}
     }
   }
   function selectTab(id,focus=false) {
@@ -124,7 +124,7 @@ export function createKeywordOpportunities(client, {remember=()=>{},onDetail,onS
       user=nextUser;profile=nextProfile;
       if(key===contextKey)return;
       contextKey=key;personal.setContext(user,profile);
-      context++;request++;data=null;loading=false;active='blue';field='__mine__';
+      context++;request++;data=null;loading=false;pendingField=null;active='blue';field='__mine__';
       rows.clear();saving.clear();savedOverrides.clear();
       $('opportunityCards').innerHTML='';$('opportunitySummary').textContent='';message('');syncTabs();
     }
