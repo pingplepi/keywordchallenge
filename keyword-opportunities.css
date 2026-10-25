@@ -47,3 +47,14 @@
 .personal-evidence li { display:flex; justify-content:space-between; gap:12px; flex-wrap:wrap; font-size:var(--font-label); }
 .personal-evidence li span { color:#756880; font-size:var(--font-caption); }
 @media(max-width:640px) { .discovery-search-tabs { grid-template-columns:repeat(2,minmax(0,1fr)); } .topic-discovery form > .button { width:100%; } .personal-evidence { padding:16px; } }
+/* The explorer owns recommendations; dashboards keep one compact entry point. */
+.keyword-explore-shortcut { display:flex; justify-content:flex-end; }
+.discovery-search-tabs { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:8px; }
+.discovery-search-tabs [role="tab"] { justify-content:center; }
+#personalKeywordPanel > .personal-keywords { border:0; padding-top:0; margin-top:0; }
+#personalKeywordPanel[hidden], #opportunitiesKeywordPanel[hidden], #topicKeywordPanel[hidden], #opportunitiesKeywordPanel > [hidden], #personalKeywordPanel > [hidden] { display:none; }
+@media(max-width:640px) {
+  .discovery-search-tabs { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  .discovery-search-tabs [role="tab"] { font-size:var(--font-label); min-height:44px; }
+  .keyword-explore-shortcut .button { width:100%; justify-content:center; }
+}
