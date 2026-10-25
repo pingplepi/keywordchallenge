@@ -258,3 +258,13 @@ keychallenge_keyword_opportunities는 본인 인플홈과 공개된 최신 목�
 - 관심 분야 미설정 시 설정 링크를, 수집된 글이 없을 때는 작성 여부 비교 전 안내를 제공합니다.
 - 추천 조회는 저장된 데이터만 사용하며 검색 API를 호출하지 않습니다. 기존 보관함 저장 RPC와 회원 한도를 그대로 적용합니다.
 - DB 함수: `keychallenge_blogger_keyword_opportunities()`. 호출자의 블로그·글·보관함만 읽는 SECURITY INVOKER 함수입니다.
+
+## Blog body statistics
+
+Opening Blog Analysis queues the currently displayed (up to 20) owned posts for body statistics. Search checks and Search API budgets are unchanged. A separate metrics branch of `keychallenge-blog-sync` reads public article HTML without cookies, executing scripts, or downloading images, and stores only counts and timestamps.
+
+- Successful counts are cached for 24 hours; unavailable results retry after 1 hour when the analysis page is opened. Requests and worker leases prevent duplicate collection.
+- SmartEditor `.se-main-container` paragraphs include text, quotations, tables, and captions. Titles, comments, profile images, ads, link previews, maps, formulas, stickers, and videos are excluded. Whitespace is normalized and counts use Unicode code points. Photos are counted by their displayed positions, including repeated photos.
+- Unsupported/blocked/oversized pages show “집계 불가”; a previous successful result remains labeled with its original collection time. No incomplete RSS snippet is reported as a full-body count.
+- Jobs are private. Authenticated members can queue only existing posts of their currently linked blog; only the service worker can write results. The worker has a two-minute lease, bounded batches, a 12-second request timeout, and a 2 MB HTML limit.
+- Schema changes: `20261025155925_add_blog_body_metrics.sql` and `20261025160513_fix_blog_metrics_worker_aliases.sql`. The existing minute dispatcher processes queued work; this does not enable daily RSS collection or automatic search checks.
