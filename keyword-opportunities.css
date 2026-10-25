@@ -32,7 +32,9 @@
   .keyword-opportunities .section-heading > .button { margin-top:12px; }
 }
 /* Topic and personal recommendations reuse the shared controls and cards. */
-#directKeywordPanel { display:grid; gap:var(--section-gap,24px); }
+#directKeywordPanel { display:grid; grid-template-columns:minmax(0,1fr); min-width:0; gap:var(--section-gap,24px); }
+#directKeywordPanel > .work-panel, #blogSearchResults { min-width:0; }
+#blogSearchResults .table-wrap { max-width:100%; overflow-x:auto; }
 #directKeywordPanel[hidden] { display:none; }
 .discovery-search-tabs { margin-bottom:var(--inner-gap); }
 .topic-discovery form { display:grid; gap:var(--inner-gap,16px); }
