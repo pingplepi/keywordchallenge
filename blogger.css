@@ -28,6 +28,9 @@
 .blogger-attack-table .tbl{min-width:920px}
 .blogger-attack-table th{background:#faf9fc}
 .blogger-attack-table td{vertical-align:middle}
+/* Match the influencer keyword button's vertical space without adding a fake button. */
+.blogger-attack-keyword{display:inline-block;min-width:90px;padding:3px 0;font-weight:700}
+#discoveryRanking .section-heading{flex-wrap:wrap}
 .blogger-attack-table td:nth-child(3),.blogger-attack-table td:nth-child(4),.blogger-attack-table td:nth-child(5),.blogger-attack-table td:nth-child(6){white-space:nowrap}
 .blogger-attack-table td.reason{min-width:260px;white-space:normal}
 .discovery-change{align-items:flex-start;flex-direction:column;gap:8px}
