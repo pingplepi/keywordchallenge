@@ -57,3 +57,21 @@
 .writing-guide textarea{width:100%;padding:14px;font:inherit;font-size:var(--font-label);line-height:1.8;border:1px solid var(--line);border-radius:12px;resize:vertical;box-sizing:border-box}
 .writing-guide [hidden]{display:none}
 @media(max-width:700px){.writing-guide-controls,.writing-guide-columns{grid-template-columns:1fr}.writing-guide .work-section-title>.button{width:100%}.writing-guide-context{padding:16px}}
+/* Reader and perspective guide. */
+.writing-guide-controls{grid-template-columns:repeat(3,minmax(0,1fr))}
+.writing-prompts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:var(--inner-gap,16px)}
+.writing-prompt{display:flex;flex-direction:column;gap:12px;min-width:0;font-size:var(--font-label);line-height:1.8;margin:0}
+.writing-prompt textarea{margin-top:auto;min-height:120px;background:#fff;font-weight:400;color:var(--ink);white-space:pre-wrap}
+.writing-memory-note{margin-top:12px;line-height:1.8}
+.writing-checklist{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px 20px}
+.writing-checklist label{display:flex;align-items:flex-start;gap:10px;min-width:0;margin:0;font-size:var(--font-label);font-weight:400;line-height:1.8;overflow-wrap:anywhere}
+.writing-checklist input{width:18px;height:18px;min-width:18px;margin:4px 0 0;padding:0;accent-color:var(--accent)}
+.writing-reference{margin-top:24px;border-top:1px solid var(--line);padding-top:20px;font-size:var(--font-body);line-height:1.85;overflow-wrap:anywhere}
+.writing-reference summary{cursor:pointer;color:var(--accent-dark);font-weight:650}
+.writing-reference h3{font-size:var(--font-card-title);margin:24px 0 12px}
+.writing-reference ul,.writing-reference ol{padding-left:22px}
+.writing-reference li+li{margin-top:8px}
+.writing-lead{padding:16px;border-radius:12px;background:#f5f1fc;white-space:pre-wrap}
+.writing-outline p{white-space:pre-wrap}
+@media(max-width:900px){.writing-prompts{grid-template-columns:1fr}}
+@media(max-width:700px){.writing-guide-controls,.writing-checklist{grid-template-columns:1fr}.writing-prompt textarea{min-height:100px}}
