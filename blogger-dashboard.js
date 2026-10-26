@@ -6,7 +6,7 @@ const date = value => value ? new Date(value).toLocaleDateString('ko-KR', {timeZ
 const volume = row => row.volume_min == null ? '미확인' : row.volume_min === row.volume_max ? count(row.volume_min) : `${count(row.volume_min)}–${count(row.volume_max)}`;
 const empty = text => `<div class="work-empty">${esc(text)}</div>`;
 
-function makeWritingGuide(row,style='questions') {
+function writingTopic(row) {
   const keyword=String(row.keyword||'').trim(),field=String(row.field||'');
   const profiles=[
     {match:/예약방법|예약하는법|숲나들|국립공원공단|홈페이지/,audience:'공식 경로에서 예약 절차와 조건을 확인하려는 사람',focus:'예약 경로·절차·취소 조건',sections:[['공식 예약 경로','공식 홈페이지와 예약하려는 시설·서비스를 구분해 안내해 보세요.'],['예약 전 준비','이용 날짜, 인원, 계정 등 실제로 필요한 정보를 확인해 보세요.'],['예약 진행 순서','조회·선택·결제·확인 단계에서 헷갈리는 부분을 순서대로 설명해 보세요.'],['변경과 취소','변경 가능 여부, 취소 조건과 환불 안내의 확인 날짜를 넣어보세요.'],['예약 후 확인','예약 내역에서 확인할 내용과 이용 당일 준비물을 모아보세요.']],questions:['어느 공식 경로에서 예약하나요?','예약하기 전에 어떤 정보를 준비하나요?','예약 변경·취소 조건은 어디에서 확인하나요?'],materials:['공식 예약 안내와 확인 날짜','개인정보를 가린 직접 확인 화면','이용 조건·취소 규정의 출처']},
@@ -22,12 +22,30 @@ function makeWritingGuide(row,style='questions') {
   ];
   const generic={audience:'이 주제를 처음 알아보고 다음 행동을 정하려는 사람',focus:'핵심 정보·확인 기준·실천 순서',sections:[['독자의 질문 정하기','이 글에서 답할 질문 한 가지와 대상 독자를 정해보세요.'],['기본 정보 확인','의미·조건·범위를 신뢰할 수 있는 자료로 확인해 보세요.'],['핵심 내용 구성','독자가 궁금해할 순서대로 내용을 세 부분으로 나누어 보세요.'],['근거와 실제 사례','직접 확인한 사례와 자료의 출처·날짜를 함께 정리해 보세요.'],['다음 행동 정리','독자가 글을 읽고 확인하거나 실행할 일을 마무리에 넣어보세요.']],questions:['이 글을 찾는 사람의 가장 큰 궁금증은 무엇인가요?','내가 직접 확인한 정보는 무엇인가요?','읽은 뒤 어떤 판단이나 행동에 도움이 되나요?'],materials:['직접 확인한 경험이나 사례 메모','참고 자료의 출처와 확인 날짜','설명에 도움이 되는 직접 만든 사진·표']};
   const p=profiles.find(p=>p.match?.test(keyword))||profiles.find(p=>p.fields?.test(field))||generic;
-  const modes={questions:{label:'궁금증 해결',direction:'처음 알아보는 독자가 질문하는 순서대로 핵심 정보를 풀어보세요.',titles:[keyword+' 처음 알아볼 때｜'+p.focus,keyword+' 가이드｜미리 확인할 5가지',keyword+' 궁금한 점 정리와 준비 체크리스트']},experience:{label:'경험 정리',direction:'직접 경험한 경우 선택 이유, 실제 과정과 아쉬운 점을 구체적인 기록으로 채워보세요.',titles:[keyword+' 경험 정리｜선택한 이유와 실제 과정',keyword+' 직접 경험하며 알게 된 점과 아쉬운 점',keyword+' 기록｜다시 준비한다면 확인할 것']},compare:{label:'비교와 선택',direction:'실제로 확인한 선택지에 같은 기준을 적용하고, 독자의 상황에 따라 선택이 달라지는 이유를 설명해 보세요.',titles:[keyword+' 선택 가이드｜'+p.focus,keyword+' 비교 전 확인할 기준 5가지',keyword+' 나에게 맞게 고르는 방법']}};
-  const mode=modes[style]||modes.questions;
-  let sections=p.sections.map(x=>[...x]);
-  if(style==='experience'){sections[0]=['선택한 이유와 경험 조건','이 주제를 고른 이유, 경험한 날짜와 상황을 먼저 적어보세요.'];sections[4]=['다시 한다면 바꿀 점','실제로 좋았던 점과 아쉬운 점을 근거와 함께 적고, 다음 사람에게 도움이 될 확인 사항을 정리해 보세요.'];}
-  if(style==='compare'){sections[0]=['비교 대상과 조건 정하기','실제로 확인한 선택지와 날짜·옵션 등 비교 조건을 먼저 밝혀보세요.'];sections[4]=['상황별 선택 정리','예산·시간·목적 등 독자의 조건에 따라 어떤 기준을 우선할지 설명해 보세요.'];}
-  return {keyword,style:mode.label,audience:p.audience,direction:mode.direction,titles:mode.titles,sections,questions:p.questions,materials:p.materials};
+  return {keyword,field,...p};
+}
+
+function writingChoices(topic) {
+  const travel=/여행/.test(topic.field)||(!topic.field||topic.field==='기타')&&/호텔|숙소|비행기|항공|공항|기차|KTX|해외여행/.test(topic.keyword);
+  const cooking=/레시피|만들기|만드는법|요리|반찬|베이킹/.test(topic.keyword);
+  const product=/뷰티|패션|IT테크|자동차|리빙/.test(topic.field);
+  const readers=travel?[['first','처음 방문하는 사람','처음 준비할 때 놓치기 쉬운 조건'],['solo','혼자 여행하는 사람','혼자 이동·이용할 때의 편의와 제약'],['parents','부모님과 동행하는 사람','이동 부담·휴식·부모님의 선호'],['children','아이와 동행하는 사람','연령 조건·휴식·아이와 함께할 동선']]:cooking?[['first','처음 만들어보는 사람','처음 만들 때 헷갈리는 과정'],['family','가족과 함께 먹을 사람','먹는 사람의 취향·분량·식재료 조건'],['repeat','만들어본 경험이 있는 사람','기존 방법에서 바꾸어볼 부분'],['busy','짧은 시간에 준비할 사람','실제 준비 시간과 줄일 수 있는 과정']]:product?[['first','처음 구매·사용하는 사람','처음 선택할 때 확인할 기능과 조건'],['repeat','이미 사용해 본 사람','기존에 쓰던 것과 달라지는 점'],['gift','선물을 고르는 사람','받는 사람의 취향·사용 환경·교환 조건'],['similar','사용 환경이 비슷한 사람','사용 장소·기간·목적에 따른 차이']]:[['first','처음 알아보는 사람','처음 접할 때 헷갈리는 개념과 조건'],['compare','선택을 고민하는 사람','비교할 기준과 선택에 따른 차이'],['repeat','다시 시도하는 사람','이전 경험에서 바꾸고 싶은 부분'],['busy','시간이 부족한 사람','먼저 확인할 핵심과 필요한 시간']];
+  const angles=[['cost','비용·시간과 선택 기준','확인한 비용·시간의 기준 날짜와 포함·제외 항목'],['process',travel?'예약·이용 과정':'준비·실행 과정','공식 절차와 직접 해본 과정을 구분한 자료'],['difference','예상과 달랐던 점','예상과 실제를 비교할 구체적인 조건·기록'],['choice','다시 선택한다면','선택의 장단점과 다시 확인해야 할 조건']];
+  return {readers,angles};
+}
+
+function buildWritingGuide(topic,readerId,angleId,notes=[]) {
+  const {readers,angles}=writingChoices(topic),reader=readers.find(x=>x[0]===readerId),angle=angles.find(x=>x[0]===angleId);
+  if(!reader||!angle)return null;
+  const keyword=topic.keyword;
+  const prompts={cost:[keyword+'에 실제로 들었거나 확인한 비용·시간은 얼마였나요? 날짜와 조건도 적어보세요.','예상하지 못한 추가 비용이나 준비 시간이 있었나요? 없었다면 무엇을 확인했나요?','이 독자에게 비용·시간을 쓰더라도 챙기라고 권하고 싶은 것은 무엇인가요?'],process:[keyword+'을 준비하거나 이용할 때 가장 헷갈렸던 단계는 무엇인가요?','직접 해보고 알게 된 순서·준비물·주의점은 무엇인가요?','이 독자라면 어느 단계를 먼저 설명해 주고 싶나요?'],difference:[keyword+'을 알아보기 전에는 무엇을 예상했나요?','직접 확인한 결과는 어떻게 달랐나요? 그렇게 느낀 상황을 적어보세요.','이 독자에게는 그 차이가 어떤 의미가 있을까요?'],choice:[keyword+'을 고를 때 중요하게 본 기준과 다른 선택지는 무엇이었나요?','내 선택에서 좋았던 점과 아쉬웠던 점은 무엇인가요?','같은 독자의 상황에서 다시 선택한다면 유지하거나 바꿀 것은 무엇인가요?']};
+  const questions=prompts[angleId];
+  const answers=questions.map((_,i)=>String(notes[i]||'').trim().slice(0,600));
+  const lead=answers.find(Boolean)||'';
+  const headings={cost:['내 조건에서 확인한 비용·시간','추가로 들었던 것과 포함 항목','독자에게 권할 우선순위'],process:['가장 헷갈렸던 단계','내가 확인한 진행 순서','독자가 먼저 준비할 것'],difference:['가기 전·해보기 전의 예상','실제로 확인한 차이','이 독자에게 달라지는 판단'],choice:['선택할 때 중요했던 기준','직접 확인한 장점과 아쉬움','다시 선택할 때 바꿀 것']}[angleId];
+  const titles=[keyword+' — '+reader[1]+'을 위한 '+angle[1],keyword+'에서 [내가 직접 확인한 핵심]을 이야기한다면'];
+  if(lead)titles.unshift(keyword+' — '+(lead.length>55?lead.slice(0,55)+'…':lead));
+  return {keyword,reader:reader[1],readerNeed:reader[2],angle:angle[1],questions,answers,lead,titles,sections:headings.map((heading,i)=>({heading,note:answers[i]||questions[i]})),checklist:[...topic.materials,reader[2]+'에 필요한 정보',angle[2]]};
 }
 
 export function createBloggerDashboard(client, {notify, onSearch}) {
@@ -35,9 +53,9 @@ export function createBloggerDashboard(client, {notify, onSearch}) {
   let user = null, settings = null, contextKey = '', generation = 0;
   let data = null, visible = false, loading = false, loadedAt = 0, reloadAfter = false;
   const saving = new Set();
-  let guideKeyword='',guideStyle='questions';
+  let guideKeyword='';const guideDrafts=new Map();
 
-  root.innerHTML = `<div class="work-heading"><div><p class="eyebrow">YOUR NEXT STORY</p><h1>키온 대시보드</h1><p class="muted">오늘 쓸 글감을 고르고, 제목부터 소제목까지 구성해 보세요.</p></div><button class="button button-light" data-discovery-action="refresh">추천 새로고침</button></div>
+  root.innerHTML = `<div class="work-heading"><div><p class="eyebrow">YOUR NEXT STORY</p><h1>키온 대시보드</h1><p class="muted">오늘 쓸 글감을 고르고, 내 경험과 관점으로 풀어보세요.</p></div><button class="button button-light" data-discovery-action="refresh">추천 새로고침</button></div>
     <div id="discoveryStatus" class="message" role="status"></div><div id="discoveryOverview"></div><section id="bloggerOpportunities" class="panel work-panel"></section><div id="discoveryBody"></div>`;
 
   const opportunities=createKeywordOpportunities(client,{
@@ -46,16 +64,10 @@ export function createBloggerDashboard(client, {notify, onSearch}) {
   });
 
   function actions(row) {
-    return `<div class="work-card-actions"><button class="button button-light" data-discovery-action="guide" data-keyword="${esc(row.keyword)}">글 구성하기</button><button class="button button-quiet" data-discovery-action="save" data-keyword="${esc(row.keyword)}" ${row.saved?'disabled':''}>${row.saved?'보관됨 ✓':'글감 보관'}</button><button class="work-text-button" data-discovery-action="search" data-keyword="${esc(row.keyword)}">키워드 탐색으로</button></div>`;
+    return `<div class="work-card-actions"><button class="button button-light" data-discovery-action="guide" data-keyword="${esc(row.keyword)}">내 관점으로 쓰기</button><button class="button button-quiet" data-discovery-action="save" data-keyword="${esc(row.keyword)}" ${row.saved?'disabled':''}>${row.saved?'보관됨 ✓':'글감 보관'}</button><button class="work-text-button" data-discovery-action="search" data-keyword="${esc(row.keyword)}">키워드 탐색으로</button></div>`;
   }
   function idea(row, index) {
-    const angles = [
-      ['경험 정리', '직접 경험한 내용이 있다면 과정, 장단점, 미리 알면 좋은 점을 정리해 보세요.'],
-      ['궁금증 해결', '처음 찾아보는 사람이 궁금해할 질문과 답을 중심으로 구성해 보세요.'],
-      ['비교와 선택', '선택 기준과 확인할 사항을 비교해 독자의 결정을 도와주세요.']
-    ];
-    const [angle, description] = angles[index % angles.length];
-    return `<article class="work-keyword-card discovery-idea"><div class="work-section-title"><span class="count-chip">${row.saved?'보관한 글감':esc(row.field || '관심 키워드')}</span><span class="discovery-angle">${angle}</span></div><h3>${esc(row.keyword)}</h3><p class="discovery-prompt">${description}</p><p class="work-volume">${volume(row)}<small>월 검색량 · ${row.collected_at?`${date(row.collected_at)} 조회`:'최근 조회 기록 없음'}</small></p><small class="muted">${data.post_count?'수집된 글 제목에서 이 키워드를 찾지 못했어요.':'글 수집 전으로, 관심 분야와 보관함에서 추천합니다.'}</small>${actions(row)}</article>`;
+    return `<article class="work-keyword-card discovery-idea"><div class="work-section-title"><span class="count-chip">${row.saved?'보관한 글감':esc(row.field || '관심 키워드')}</span></div><h3>${esc(row.keyword)}</h3><p class="discovery-prompt">독자와 관점을 고르고, 이 주제에서 직접 확인한 이야기를 떠올려 보세요.</p><p class="work-volume">${volume(row)}<small>월 검색량 · ${row.collected_at?`${date(row.collected_at)} 조회`:'최근 조회 기록 없음'}</small></p><small class="muted">${data.post_count?'수집된 글 제목에서 이 키워드를 찾지 못했어요.':'글 수집 전으로, 관심 분야와 보관함에서 추천합니다.'}</small>${actions(row)}</article>`;
   }
   function metric(label, value, detail, target, type='') {
     const attr = target.startsWith('#') ? `href="${target}"` : `type="button" data-discovery-action="jump" data-section="${target}"`;
@@ -74,9 +86,9 @@ export function createBloggerDashboard(client, {notify, onSearch}) {
       </div>
       `;
     $('discoveryBody').innerHTML = `
-      <section id="discoveryIdeas" class="panel work-panel"><div class="work-section-title"><div><p class="eyebrow">TODAY’S IDEAS</p><h2>오늘의 추천 글감 <span class="count-chip">${data.ideas.length}개</span></h2></div><span class="count-chip">${esc(data.day.replaceAll('-','/'))} 기준</span></div><p class="muted discovery-description">관심 분야와 보관한 키워드에서 글감을 고르고 ‘글 구성하기’를 눌러 보세요.</p><div class="work-keyword-grid">${data.ideas.length?data.ideas.map(idea).join(''):empty('아직 추천할 글감이 없습니다. 관심 분야를 선택하거나 키워드 검색에서 글감을 보관해 주세요.')}</div></section>
+      <section id="discoveryIdeas" class="panel work-panel"><div class="work-section-title"><div><p class="eyebrow">TODAY’S IDEAS</p><h2>오늘의 추천 글감 <span class="count-chip">${data.ideas.length}개</span></h2></div><span class="count-chip">${esc(data.day.replaceAll('-','/'))} 기준</span></div><p class="muted discovery-description">관심 분야와 보관한 키워드에서 글감을 고르고 ‘내 관점으로 쓰기’를 눌러 보세요.</p><div class="work-keyword-grid">${data.ideas.length?data.ideas.map(idea).join(''):empty('아직 추천할 글감이 없습니다. 관심 분야를 선택하거나 키워드 검색에서 글감을 보관해 주세요.')}</div></section>
 
-      <section id="discoveryWritingGuide" class="panel work-panel writing-guide" tabindex="-1"><div class="work-section-title"><div><p class="eyebrow">TODAY’S WRITING GUIDE</p><h2>오늘의 글쓰기 가이드</h2></div><button class="button button-light" data-discovery-action="guide-copy" ${data.ideas.length?'':'disabled'}>구성안 복사</button></div><p class="muted discovery-description">주제와 글 유형에 맞춘 구성 참고안입니다. 직접 확인한 경험과 자료로 내용을 채워보세요.</p>${data.ideas.length?'<div class="writing-guide-controls"><label>글감 선택<select data-writing-keyword>'+data.ideas.map(row=>'<option value="'+esc(row.keyword)+'">'+esc(row.keyword)+'</option>').join('')+'</select></label><label>글 유형<select data-writing-style><option value="questions">궁금증 해결</option><option value="experience">경험 정리</option><option value="compare">비교와 선택</option></select></label></div><div data-writing-output></div><p class="message" role="status" data-writing-status></p><label data-writing-fallback hidden>구성안 직접 복사<textarea data-writing-copytext readonly rows="10"></textarea></label>':empty('추천 글감이 생기면 제목 후보와 글 구성안을 보여드립니다. 관심 분야를 설정하거나 키워드 탐색에서 글감을 보관해 주세요.')}</section>
+      ${writingGuidePanel()}
       <section class="panel work-panel"><div class="work-section-title"><div><p class="eyebrow">KEYWORD OPPORTUNITIES</p><h2>검색량 높은 새 글감 TOP 10</h2></div><a href="#keywordSearchView">다른 키워드 찾기 ↗</a></div><p class="muted discovery-description">${data.post_count?'수집된 글 제목에서 찾지 못한 후보를 월 검색량순으로 보여드립니다.':'아직 글을 수집하지 않아, 관심 분야의 검색량 높은 후보를 보여드립니다.'}</p>
       <ol class="discovery-opportunities">${data.opportunities.length?data.opportunities.map((row,index)=>`<li><span class="priority-number">${index+1}</span><div class="discovery-keyword"><strong>${esc(row.keyword)}</strong><small class="muted">${esc(row.field || '내 보관함')} · ${date(row.collected_at)} 조회</small></div><div class="discovery-volume"><strong>${volume(row)}</strong><small>월 검색량</small></div><button class="button button-light" data-discovery-action="save" data-keyword="${esc(row.keyword)}" ${row.saved?'disabled':''}>${row.saved?'보관됨 ✓':'글감 보관'}</button></li>`).join(''):''}</ol>
       ${!data.opportunities.length?empty('최근 30일 내 검색량이 확인된 추천 후보가 없습니다. 관심 분야를 확인하거나 키워드 검색에서 새로운 글감을 찾아보세요.'):''}
@@ -84,21 +96,49 @@ export function createBloggerDashboard(client, {notify, onSearch}) {
       <details class="discovery-method"><summary>추천 기준과 데이터 범위</summary><p>관심 분야의 검색량 높은 키워드 최대 300개와 내 보관함을 후보로 사용합니다. 수집된 글 제목에 키워드가 포함되어 있으면 추천에서 제외합니다. 공백과 영문 대소문자를 정리한 단순 제목 비교이며, 글 본문이나 블로그 전체 이력을 분석한 결과는 아닙니다.</p><p>오늘의 추천은 후보 중 상위 30개에서 한국시간 날짜별로 최대 9개를 고릅니다. 후보가 적으면 확보된 개수만 표시합니다. 보관 키워드를 우선 후보에 넣으며, 검색량은 최근 30일 안에 조회한 네이버 검색광고 PC·모바일 합계입니다. 검색량을 확인하지 않은 보관 글감은 ‘미확인’으로 표시합니다.</p><p>대시보드는 저장된 데이터를 사용합니다. 새로고침해도 검색 노출 점검 횟수는 차감되지 않으며, 실제 점검은 내 블로그 분석의 버튼을 눌렀을 때만 실행됩니다.</p></details>`;
     renderGuide();
   }
+  function writingGuidePanel(){
+  return `<section id="discoveryWritingGuide" class="panel work-panel writing-guide" tabindex="-1"><div class="work-section-title"><div><p class="eyebrow">TODAY’S WRITING GUIDE</p><h2>오늘의 글쓰기 가이드</h2></div><button class="button button-light" data-discovery-action="guide-copy" disabled>기획 메모 복사</button></div><p class="muted discovery-description">누구에게 어떤 이야기를 전할지 골라보세요. 직접 경험한 내용을 덧붙여 내 관점의 글을 준비합니다.</p>${data.ideas.length?'<div class="writing-guide-controls"><label>글감 선택<select data-writing-keyword>'+data.ideas.map(row=>'<option value="'+esc(row.keyword)+'">'+esc(row.keyword)+'</option>').join('')+'</select></label><label>누구에게 쓸까요?<select data-writing-reader><option value="">독자 선택</option></select></label><label>어떤 관점으로 쓸까요?<select data-writing-angle><option value="">관점 선택</option></select></label></div><div data-writing-output></div><p class="message" role="status" data-writing-status></p><label data-writing-fallback hidden>기획 메모 직접 복사<textarea data-writing-copytext readonly rows="10"></textarea></label>':empty('관심 분야를 설정하거나 키워드 탐색에서 글감을 보관하면 글쓰기 가이드를 시작할 수 있습니다.')}</section>`;
+}
+  function guideDraft(){
+  if(!guideDrafts.has(guideKeyword))guideDrafts.set(guideKeyword,{reader:'',angle:'',variants:new Map()});
+  return guideDrafts.get(guideKeyword);
+}
+  function guideVariant(){
+  const draft=guideDraft(),key=draft.reader+'|'+draft.angle;
+  if(!draft.variants.has(key))draft.variants.set(key,{notes:['','',''],checked:new Set()});
+  return draft.variants.get(key);
+}
   function selectedGuide(){
-    const row=data?.ideas.find(row=>row.keyword===guideKeyword);
-    return row?makeWritingGuide({...row,field:row.field||data.interest},guideStyle):null;
-  }
+  const row=data?.ideas.find(row=>row.keyword===guideKeyword);if(!row)return null;
+  const draft=guideDraft();
+  return buildWritingGuide(writingTopic({...row,field:row.field||data.interest}),draft.reader,draft.angle,guideVariant().notes);
+}
+  function updateGuideReference(){
+  const output=root.querySelector('[data-writing-reference]'),guide=selectedGuide();if(!output||!guide)return;
+  output.innerHTML=(guide.lead?'<p class="writing-lead"><b>내 메모에서 꺼낸 이야기</b><br>'+esc(guide.lead)+'</p>':'<p class="muted small">경험 메모를 적으면 여기에 함께 표시됩니다. 실제로 확인한 내용으로 표현을 바꿔보세요.</p>')+'<h3>제목을 생각할 때 참고할 표현</h3><ul>'+guide.titles.map(text=>'<li>'+esc(text)+'</li>').join('')+'</ul><h3>이야기를 묶어볼 순서</h3><p class="muted small">필요한 부분만 고르고 순서도 자유롭게 바꿔보세요.</p><ol class="writing-outline">'+guide.sections.map(item=>'<li><strong>'+esc(item.heading)+'</strong><p>'+esc(item.note)+'</p></li>').join('')+'</ol>';
+}
   function renderGuide(){
-    const output=root.querySelector('[data-writing-output]');if(!output)return;
-    if(!data.ideas.some(row=>row.keyword===guideKeyword))guideKeyword=data.ideas[0]?.keyword||'';
-    root.querySelector('[data-writing-keyword]').value=guideKeyword;root.querySelector('[data-writing-style]').value=guideStyle;
-    const guide=selectedGuide();if(!guide)return;
-    const list=items=>items.map(text=>'<li>'+esc(text)+'</li>').join('');
-    output.innerHTML='<div class="writing-guide-context"><strong>'+esc(guide.keyword)+'</strong><span class="count-chip">'+esc(guide.style)+'</span><p><b>주요 독자</b> · '+esc(guide.audience)+'</p><p>'+esc(guide.direction)+'</p></div><div class="writing-guide-block"><h3>제목 후보</h3><ol>'+list(guide.titles)+'</ol></div><div class="writing-guide-block"><h3>추천 소제목과 담을 내용</h3><ol class="writing-outline">'+guide.sections.map(([title,note])=>'<li><strong>'+esc(title)+'</strong><p>'+esc(note)+'</p></li>').join('')+'</ol></div><div class="writing-guide-columns"><div class="writing-guide-block"><h3>독자가 궁금해할 질문</h3><ul>'+list(guide.questions)+'</ul></div><div class="writing-guide-block"><h3>준비할 자료</h3><ul>'+list(guide.materials)+'</ul></div></div>';
-    root.querySelector('[data-writing-status]').textContent='';root.querySelector('[data-writing-fallback]').hidden=true;
-  }
-  function guideText(guide){return ['오늘의 글쓰기 가이드 · '+guide.keyword,'글 유형: '+guide.style,'주요 독자: '+guide.audience,guide.direction,'','제목 후보',...guide.titles.map((x,i)=>(i+1)+'. '+x),'','추천 소제목과 담을 내용',...guide.sections.map(([title,note],i)=>(i+1)+'. '+title+'\n'+note),'','독자가 궁금해할 질문',...guide.questions.map(x=>'• '+x),'','준비할 자료',...guide.materials.map(x=>'• '+x)].join('\n');}
-  root.addEventListener('change',event=>{if(event.target.matches('[data-writing-keyword]')){guideKeyword=event.target.value;renderGuide();}if(event.target.matches('[data-writing-style]')){guideStyle=event.target.value;renderGuide();}});
+  const output=root.querySelector('[data-writing-output]');if(!output)return;
+  if(!data.ideas.some(row=>row.keyword===guideKeyword))guideKeyword=data.ideas[0]?.keyword||'';
+  const row=data.ideas.find(row=>row.keyword===guideKeyword);if(!row)return;
+  const draft=guideDraft(),choices=writingChoices(writingTopic({...row,field:row.field||data.interest}));
+  if(!choices.readers.some(x=>x[0]===draft.reader))draft.reader='';if(!choices.angles.some(x=>x[0]===draft.angle))draft.angle='';
+  root.querySelector('[data-writing-keyword]').value=guideKeyword;
+  const options=(label,items)=>'<option value="">'+label+'</option>'+items.map(x=>'<option value="'+esc(x[0])+'">'+esc(x[1])+'</option>').join('');
+  const reader=root.querySelector('[data-writing-reader]'),angle=root.querySelector('[data-writing-angle]');reader.innerHTML=options('독자 선택',choices.readers);reader.value=draft.reader;angle.innerHTML=options('관점 선택',choices.angles);angle.value=draft.angle;
+  const guide=selectedGuide();root.querySelector('[data-discovery-action="guide-copy"]').disabled=!guide;
+  root.querySelector('[data-writing-status]').textContent='';root.querySelector('[data-writing-fallback]').hidden=true;
+  if(!guide){output.innerHTML=empty('독자와 관점을 선택하면, 내 경험을 떠올릴 질문과 필요한 정보 체크리스트를 보여드립니다.');return;}
+  const variant=guideVariant();
+  output.innerHTML='<div class="writing-guide-context"><strong>'+esc(guide.keyword)+'</strong><span class="count-chip">'+esc(guide.angle)+'</span><p><b>이 글의 독자</b> · '+esc(guide.reader)+'</p><p>'+esc(guide.readerNeed)+'에 초점을 맞춰 이야기해 보세요.</p></div><div class="writing-guide-block"><h3>내 경험을 꺼내볼 질문</h3><p class="muted small">메모는 선택 사항입니다. 직접 경험하지 않았다면 확인한 자료와 출처를 적고, 경험담으로 표현하지 마세요.</p><div class="writing-prompts">'+guide.questions.map((question,i)=>'<label class="writing-prompt"><span>'+esc(question)+'</span><textarea data-writing-note="'+i+'" maxlength="600" rows="3" placeholder="짧게 적어도 좋아요. 직접 확인한 경험·조건·출처를 남겨보세요.">'+esc(variant.notes[i])+'</textarea></label>').join('')+'</div><p class="muted small writing-memory-note">메모와 체크는 글감·독자·관점별로 유지되며, 새로고침·로그아웃·내 설정 변경 시 초기화됩니다. 보관하려면 기획 메모를 복사해 주세요.</p></div><div class="writing-guide-block"><div class="work-section-title"><h3>필요한 정보 체크리스트</h3><span class="muted small" data-writing-check-count aria-live="polite">'+variant.checked.size+' / '+guide.checklist.length+' 확인</span></div><div class="writing-checklist">'+guide.checklist.map((item,i)=>'<label><input type="checkbox" data-writing-check="'+i+'" '+(variant.checked.has(i)?'checked':'')+'/><span>'+esc(item)+'</span></label>').join('')+'</div></div><details class="writing-reference"><summary>제목과 구성 참고안 펼쳐보기</summary><div data-writing-reference></div></details>';
+  updateGuideReference();
+}
+  function guideText(guide){
+  const variant=guideVariant();
+  return ['오늘의 글쓰기 가이드 · '+guide.keyword,'독자: '+guide.reader,'관점: '+guide.angle,'독자에게 필요한 것: '+guide.readerNeed,'','내 경험과 확인한 자료',...guide.questions.flatMap((question,i)=>[(i+1)+'. '+question,guide.answers[i]||'(아직 작성한 메모 없음)','']),'필요한 정보 체크리스트',...guide.checklist.map((item,i)=>(variant.checked.has(i)?'[확인] ':'[확인 전] ')+item),'','제목 참고안 · 내 표현으로 바꾸어 사용',...guide.titles.map(x=>'• '+x),'','구성 참고안 · 순서와 내용은 자유롭게 선택',...guide.sections.map((item,i)=>(i+1)+'. '+item.heading+'\n'+item.note)].join('\n');
+}
+  root.addEventListener('change',event=>{const el=event.target;if(el.matches('[data-writing-keyword]')){guideKeyword=el.value;renderGuide();}else if(el.matches('[data-writing-reader]')){guideDraft().reader=el.value;renderGuide();}else if(el.matches('[data-writing-angle]')){guideDraft().angle=el.value;renderGuide();}else if(el.matches('[data-writing-check]')){const index=Number(el.dataset.writingCheck),guide=selectedGuide();if(!guide||!Number.isInteger(index)||index<0||index>=guide.checklist.length)return;const variant=guideVariant();if(el.checked)variant.checked.add(index);else variant.checked.delete(index);root.querySelector('[data-writing-check-count]').textContent=variant.checked.size+' / '+guide.checklist.length+' 확인';root.querySelector('[data-writing-status]').textContent='';root.querySelector('[data-writing-fallback]').hidden=true;}});
+  root.addEventListener('input',event=>{const el=event.target;if(!el.matches('[data-writing-note]'))return;const index=Number(el.dataset.writingNote);if(!Number.isInteger(index)||index<0||index>2||!selectedGuide())return;guideVariant().notes[index]=el.value.slice(0,600);updateGuideReference();root.querySelector('[data-writing-status]').textContent='';root.querySelector('[data-writing-fallback]').hidden=true;});
   async function load(refreshOpportunities=true) {
     if (!user || settings?.mode !== 'blogger') return;
     if (loading) { reloadAfter = true; return; }
@@ -133,8 +173,8 @@ export function createBloggerDashboard(client, {notify, onSearch}) {
     if(action==='guide'){guideKeyword=button.dataset.keyword;renderGuide();const section=$('discoveryWritingGuide');section.scrollIntoView({behavior:'smooth',block:'start'});section.focus({preventScroll:true});return;}
     if(action==='guide-copy'){
       const guide=selectedGuide();if(!guide)return;const text=guideText(guide),g=generation;
-      try{await navigator.clipboard.writeText(text);if(g===generation)root.querySelector('[data-writing-status]').textContent='구성안을 복사했습니다. 글쓰기 화면이나 메모에 붙여 넣어 사용하세요.';}
-      catch{if(g===generation){const fallback=root.querySelector('[data-writing-fallback]'),input=root.querySelector('[data-writing-copytext]');fallback.hidden=false;input.value=text;input.focus();input.select();root.querySelector('[data-writing-status]').textContent='아래 구성안을 선택해 직접 복사해 주세요.';}}return;
+      try{await navigator.clipboard.writeText(text);if(g===generation)root.querySelector('[data-writing-status]').textContent='기획 메모를 복사했습니다. 글쓰기 화면이나 메모에 붙여 넣어 보관하세요.';}
+      catch{if(g===generation){const fallback=root.querySelector('[data-writing-fallback]'),input=root.querySelector('[data-writing-copytext]');fallback.hidden=false;input.value=text;input.focus();input.select();root.querySelector('[data-writing-status]').textContent='아래 기획 메모를 선택해 직접 복사해 주세요.';}}return;
     }
     if (action === 'refresh') { void load(); return; }
     if (action === 'jump') { $(button.dataset.section)?.scrollIntoView({behavior:'smooth',block:'start'}); return; }
@@ -161,7 +201,7 @@ export function createBloggerDashboard(client, {notify, onSearch}) {
       user = nextUser; settings = nextSettings;
       opportunities.setContext(user,settings);
       if (key === contextKey) return;
-      contextKey = key; generation++; guideKeyword='';guideStyle='questions';data = null; loadedAt = 0; loading = false; reloadAfter = false; saving.clear();
+      contextKey = key; generation++; guideKeyword='';guideDrafts.clear();data = null; loadedAt = 0; loading = false; reloadAfter = false; saving.clear();
       $('discoveryOverview').innerHTML = ''; $('discoveryBody').innerHTML = ''; $('discoveryStatus').textContent = '';
       root.querySelector('[data-discovery-action="refresh"]').disabled = false;
     },
