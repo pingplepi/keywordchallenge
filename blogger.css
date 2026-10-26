@@ -24,6 +24,12 @@
 .discovery-volume small{color:var(--muted)}
 .discovery-opportunities .button{min-height:var(--control-compact-height);padding:7px 12px;font-size:var(--font-caption)}
 .discovery-row-actions{display:flex;align-items:center;justify-content:flex-end;gap:6px;flex-wrap:wrap}
+.blogger-attack-table{max-width:100%;overflow-x:auto}
+.blogger-attack-table .tbl{min-width:920px}
+.blogger-attack-table th{background:#faf9fc}
+.blogger-attack-table td{vertical-align:middle}
+.blogger-attack-table td:nth-child(3),.blogger-attack-table td:nth-child(4),.blogger-attack-table td:nth-child(5),.blogger-attack-table td:nth-child(6){white-space:nowrap}
+.blogger-attack-table td.reason{min-width:260px;white-space:normal}
 .discovery-change{align-items:flex-start;flex-direction:column;gap:8px}
 .discovery-change>div{min-width:0}
 .discovery-change-label{font-size:var(--font-caption);white-space:normal}
