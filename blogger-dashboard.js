@@ -23,7 +23,7 @@ export function createBloggerDashboard(client, {notify, onSearch}) {
   });
 
   function actions(row) {
-    return `<div class="discovery-row-actions"><button class="button button-light" data-discovery-action="save" data-keyword="${esc(row.keyword)}" ${row.saved?'disabled':''}>${row.saved?'보관됨 ✓':'글감 보관'}</button><button class="work-text-button" data-discovery-action="search" data-keyword="${esc(row.keyword)}">키워드 탐색</button></div>`;
+    return `<div class="discovery-row-actions"><button class="button button-light" data-discovery-action="save" data-keyword="${esc(row.keyword)}" ${row.saved?'disabled':''}>${row.saved?'보관됨 ✓':'글감 보관'}</button></div>`;
   }
   function idea(row, index) {
     return `<li><span class="priority-number">${index+1}</span><div class="discovery-keyword"><strong>${esc(row.keyword)}</strong><small class="muted">${row.saved?'보관한 키워드':esc(row.field || data.interest || '관심 분야 추천')} · ${data.post_count?'최근 글 제목에 없는 키워드':'글 수집 전 · 분야 기반 추천'}</small></div><div class="discovery-volume"><strong>${volume(row)}</strong><small>월 검색량${row.collected_at?` · ${date(row.collected_at)} 조회`:''}</small></div>${actions(row)}</li>`;
@@ -67,7 +67,7 @@ function scheduleVolumePoll(){stopVolumePoll();if(!visible||document.hidden||!da
       <div id="discoveryAttackRanking">${attackRankingContent()}</div>
       `;
     $('discoveryBody').innerHTML = `
-      <section id="discoveryIdeas" class="panel work-panel"><div class="work-section-title"><div><p class="eyebrow">TODAY’S IDEAS</p><h2>오늘의 추천 글감 <span class="count-chip">TOP10</span></h2></div><span class="count-chip">${esc(data.day.replaceAll('-','/'))} 기준</span></div><p class="muted discovery-description">관심 분야와 보관한 키워드에서 오늘의 글감 10개를 골라 순위표로 정리했어요.</p>${data.ideas.length?`<ol class="discovery-opportunities">${data.ideas.map(idea).join('')}</ol>`:empty('아직 추천할 글감이 없습니다. 관심 분야를 선택하거나 키워드 검색에서 글감을 보관해 주세요.')}</section>
+      <section id="discoveryIdeas" class="panel work-panel"><div class="work-section-title"><div><p class="eyebrow">TODAY’S IDEAS</p><h2>오늘의 추천 글감 <span class="count-chip">TOP10</span></h2></div><a href="#keywordSearchView">다른 키워드 찾기 ↗</a></div><p class="muted discovery-description">관심 분야와 보관한 키워드에서 오늘의 글감 10개를 골라 순위표로 정리했어요.</p>${data.ideas.length?`<ol class="discovery-opportunities">${data.ideas.map(idea).join('')}</ol>`:empty('아직 추천할 글감이 없습니다. 관심 분야를 선택하거나 키워드 검색에서 글감을 보관해 주세요.')}</section>
 
       <section id="discoveryTopKeywords" class="panel work-panel">${topKeywordsContent()}</section>
       <details class="discovery-method"><summary>추천 기준과 데이터 범위</summary><p>관심 분야의 검색량 높은 키워드 최대 300개와 내 보관함을 후보로 사용합니다. 수집된 글 제목에 키워드가 포함되어 있으면 추천에서 제외합니다. 공백과 영문 대소문자를 정리한 단순 제목 비교이며, 글 본문이나 블로그 전체 이력을 분석한 결과는 아닙니다.</p><p>오늘의 추천은 후보 중 상위 30개에서 한국시간 날짜별로 최대 10개를 고릅니다. 후보가 적으면 확보된 개수만 표시합니다. 순번은 오늘의 추천 목록 순서이며 월 검색량순은 아닙니다. 보관 키워드를 우선 후보에 넣으며, 검색량은 최근 30일 안에 조회한 네이버 검색광고 PC·모바일 합계입니다. 검색량을 확인하지 않은 보관 글감은 ‘미확인’으로 표시합니다.</p><p>접속하거나 대시보드를 열면 오늘 확인하지 않은 추천 후보의 검색량을 우선 갱신합니다. 오늘 수집한 검색량은 회원들이 함께 재사용하며, 갱신이 끝나면 TOP 10에 자동으로 반영됩니다. 매일 오전 4시 15분부터 분야별 검색량 상위 후보도 순차 갱신합니다. 검색량은 네이버가 제공하는 월 단위 수치입니다. 검색 노출 점검 횟수는 차감되지 않습니다.</p></details>`;
