@@ -99,3 +99,12 @@
 .writing-outline p{white-space:pre-wrap}
 @media(max-width:900px){.writing-prompts{grid-template-columns:1fr}}
 @media(max-width:700px){.writing-guide-controls,.writing-checklist{grid-template-columns:1fr}.writing-prompt textarea{min-height:100px}}
+
+/* Keep the blogger demand table aligned with the roomy dashboard priority tables. */
+.blogger-demand-table{min-width:0;max-width:100%;overflow-x:auto}
+.blogger-demand-table table{min-width:940px}
+.blogger-demand-table td{height:72px}
+.blogger-demand-table th:first-child,.blogger-demand-table td:first-child{width:72px}
+.blogger-demand-table th:nth-child(2),.blogger-demand-table td:nth-child(2){min-width:190px}
+.blogger-demand-table th:nth-child(3),.blogger-demand-table td:nth-child(3),.blogger-demand-table th:nth-child(4),.blogger-demand-table td:nth-child(4),.blogger-demand-table th:nth-child(5),.blogger-demand-table td:nth-child(5){white-space:nowrap}
+.blogger-demand-table .reason{min-width:245px}
