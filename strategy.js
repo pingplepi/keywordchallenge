@@ -35,7 +35,7 @@ export function createStrategy(client) {
         <div id="strategyDetailRows"></div><div class="pagination"><button id="detailPrev" class="button button-light">이전</button><span id="detailPage"></span><button id="detailNext" class="button button-light">다음</button></div>
         <p class="catalog-footnote">검색량을 모르는 키워드는 ‘미수집’으로 표시하며, 검색량 범위 필터에서는 제외합니다. 미참여는 참여 가능 여부를 뜻하지 않습니다.</p>
       </details>
-      <section class="panel strategy-panel"><div class="section-heading"><div><p class="eyebrow">NEW CONTENT OPPORTUNITIES</p><h2>검색량 높은 미참여 TOP10</h2><p id="strategyVolumeNote" class="muted"></p></div></div><div id="strategyDemand"></div></section>
+      <section class="panel strategy-panel"><div class="section-heading"><div><p class="eyebrow">NEW CONTENT OPPORTUNITIES</p><h2>검색량 높은 미참여 <span class="count-chip">TOP10</span></h2><p id="strategyVolumeNote" class="muted"></p></div></div><div id="strategyDemand"></div></section>
     </div>
     <dialog id="keywordDialog" class="keyword-dialog"><div class="dialog-head"><p class="eyebrow">KEYWORD DETAIL</p><button id="closeKeyword" class="button button-light" aria-label="키워드 상세 닫기">닫기</button></div><div id="keywordDetail"></div></dialog>`;
 
