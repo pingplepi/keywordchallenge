@@ -68,7 +68,7 @@ export function createBloggerDashboard(client, {notify, onSearch}) {
     return `<div class="work-card-actions"><button class="button button-light" data-discovery-action="guide" data-keyword="${esc(row.keyword)}">내 관점으로 쓰기</button><button class="button button-quiet" data-discovery-action="save" data-keyword="${esc(row.keyword)}" ${row.saved?'disabled':''}>${row.saved?'보관됨 ✓':'글감 보관'}</button><button class="work-text-button" data-discovery-action="search" data-keyword="${esc(row.keyword)}">키워드 탐색으로</button></div>`;
   }
   function idea(row, index) {
-    return `<article class="work-keyword-card discovery-idea"><div class="work-section-title"><span class="count-chip">${row.saved?'보관한 글감':esc(row.field || '관심 키워드')}</span></div><h3>${esc(row.keyword)}</h3><p class="discovery-prompt">독자와 관점을 고르고, 이 주제에서 직접 확인한 이야기를 떠올려 보세요.</p><p class="work-volume">${volume(row)}<small>월 검색량 · ${row.collected_at?`${date(row.collected_at)} 조회`:'최근 조회 기록 없음'}</small></p><small class="muted">${data.post_count?'수집된 글 제목에서 이 키워드를 찾지 못했어요.':'글 수집 전으로, 관심 분야와 보관함에서 추천합니다.'}</small>${actions(row)}</article>`;
+    return `<article class="work-keyword-card discovery-idea"><div class="work-section-title"><span class="priority-number">${index+1}</span><span class="count-chip">${row.saved?'보관한 글감':esc(row.field || '관심 키워드')}</span></div><h3>${esc(row.keyword)}</h3><p class="discovery-prompt">독자와 관점을 고르고, 이 주제에서 직접 확인한 이야기를 떠올려 보세요.</p><p class="work-volume">${volume(row)}<small>월 검색량 · ${row.collected_at?`${date(row.collected_at)} 조회`:'최근 조회 기록 없음'}</small></p><small class="muted">${data.post_count?'수집된 글 제목에서 이 키워드를 찾지 못했어요.':'글 수집 전으로, 관심 분야와 보관함에서 추천합니다.'}</small>${actions(row)}</article>`;
   }
   function metric(label, value, detail, target, type='') {
     const attr = target.startsWith('#') ? `href="${target}"` : `type="button" data-discovery-action="jump" data-section="${target}"`;
@@ -76,10 +76,10 @@ export function createBloggerDashboard(client, {notify, onSearch}) {
     return `<${tag} ${attr} class="panel metric ${type}"><span>${label}</span><strong>${count(value)}<span class="discovery-unit">개</span></strong><small>${detail}</small></${tag}>`;
   }
 
-  function topKeywordsContent(){return `<div class="work-section-title"><div><p class="eyebrow">TODAY’S KEYWORD OPPORTUNITIES</p><h2>오늘의 공략 키워드 <span class="count-chip">TOP10</span></h2></div><a href="#keywordSearchView">다른 키워드 찾기 ↗</a></div><p class="muted discovery-description">${data.post_count?'수집된 글 제목에 아직 없는 후보를 확인된 월 검색량순으로 보여드립니다.':'아직 글을 수집하지 않아, 관심 분야의 검색량 높은 후보를 보여드립니다.'}</p>
+  function topKeywordsContent(){return `<div class="work-section-title"><div><p class="eyebrow">KEYWORD OPPORTUNITIES</p><h2>검색량 높은 새 글감 TOP 10</h2></div><a href="#keywordSearchView">다른 키워드 찾기 ↗</a></div><p class="muted discovery-description">${data.post_count?'수집된 글 제목에서 찾지 못한 후보를 월 검색량순으로 보여드립니다.':'아직 글을 수집하지 않아, 관심 분야의 검색량 높은 후보를 보여드립니다.'}</p>
       <p class="message" role="status" aria-live="polite">${esc(volumeRefreshMessage())}</p><ol class="discovery-opportunities">${data.opportunities.length?data.opportunities.map((row,index)=>`<li><span class="priority-number">${index+1}</span><div class="discovery-keyword"><strong>${esc(row.keyword)}</strong><small class="muted">${esc(row.field || '내 보관함')} · 검색량 수집 ${date(row.collected_at)}</small></div><div class="discovery-volume"><strong>${volume(row)}</strong><small>월 검색량</small></div><button class="button button-light" data-discovery-action="save" data-keyword="${esc(row.keyword)}" ${row.saved?'disabled':''}>${row.saved?'보관됨 ✓':'글감 보관'}</button></li>`).join(''):''}</ol>
       ${!data.opportunities.length?empty('최근 30일 내 검색량이 확인된 추천 후보가 없습니다. 관심 분야를 확인하거나 키워드 검색에서 새로운 글감을 찾아보세요.'):''}
-      <p class="catalog-footnote">추천은 관심 분야·보관 키워드 중 최근 글 제목에서 찾지 못한 후보를 월 검색량순으로 정렬합니다. 글 제목에 없더라도 과거에 작성했을 수 있으며, 챌린지 참여 자격이나 노출 순위를 보장하지 않습니다.</p>`;}
+      <p class="catalog-footnote">추천은 공용 목록의 관심 분야 키워드와 내 보관함을 기준으로 합니다. 제목에 없더라도 과거에 작성했을 수 있습니다.</p>`;}
 function volumeRefreshMessage(){const refresh=data?.volume_refresh;if(!refresh)return '검색량의 수집 날짜를 확인해 주세요.';if(refresh.status==='fresh')return data.opportunities.length?'오늘 수집한 월 검색량을 반영했습니다.':'확인할 검색량 후보가 없습니다.';if(refresh.status==='disabled')return '검색량 자동 갱신이 일시 중지되어 마지막 수집값을 보여드립니다.';if(refresh.status==='error')return '검색량을 갱신하지 못해 마지막 수집값을 보여드립니다. 관리자가 수집 상태를 확인해야 합니다.';if(pollAttempts>=40)return '검색량 갱신이 계속되고 있습니다. 다음 접속 때 결과를 자동으로 반영합니다.';if(refresh.status==='refreshing')return '추천 후보의 검색량을 갱신 중입니다. 완료되면 이 목록에 자동으로 반영됩니다.';return '최근 검색량을 아직 확인하지 못해 마지막 수집값을 보여드립니다.';}
 function stopVolumePoll(){if(refreshTimer!==null){clearTimeout(refreshTimer);refreshTimer=null;}}
 function renderTopKeywords(){const section=$('discoveryTopKeywords');if(section)section.innerHTML=topKeywordsContent();}
@@ -87,6 +87,7 @@ function scheduleVolumePoll(){stopVolumePoll();if(!visible||document.hidden||!da
   function render() {
     const interest = data.interest || '관심 분야 미설정';
     const baseline = data.post_count ? `수집된 글 ${count(data.post_count)}편의 제목과 비교` : '글 수집 전 · 분야 기반 추천';
+    const rankedIdeas=[...data.ideas].sort((a,b)=>(b.volume_min??-1)-(a.volume_min??-1)||(b.volume_max??-1)-(a.volume_max??-1)||a.keyword.localeCompare(b.keyword,'ko'));
     $('discoveryOverview').innerHTML = `
       <div class="discovery-context"><div><span class="profile-chip">${esc(interest)}</span><span class="muted small">${baseline}</span></div><a href="#accountView">관심 분야 변경 ↗</a></div>
       ${!data.interest || data.interest==='기타' ? '<div class="analysis-note">내 설정에서 구체적인 관심 분야를 선택하면 분야별 추천을 받을 수 있습니다. 지금은 보관한 키워드에서 글감을 찾습니다. <a href="#accountView">분야 선택하기 ↗</a></div>' : ''}
@@ -96,7 +97,7 @@ function scheduleVolumePoll(){stopVolumePoll();if(!visible||document.hidden||!da
       </div>
       `;
     $('discoveryBody').innerHTML = `
-      <section id="discoveryIdeas" class="panel work-panel"><div class="work-section-title"><div><p class="eyebrow">TODAY’S IDEAS</p><h2>오늘의 추천 글감 <span class="count-chip">${data.ideas.length}개</span></h2></div><span class="count-chip">${esc(data.day.replaceAll('-','/'))} 기준</span></div><p class="muted discovery-description">관심 분야와 보관한 키워드에서 글감을 고르고 ‘내 관점으로 쓰기’를 눌러 보세요.</p><div class="work-keyword-grid">${data.ideas.length?data.ideas.map(idea).join(''):empty('아직 추천할 글감이 없습니다. 관심 분야를 선택하거나 키워드 검색에서 글감을 보관해 주세요.')}</div></section>
+      <section id="discoveryIdeas" class="panel work-panel"><div class="work-section-title"><div><p class="eyebrow">TODAY’S KEYWORD TARGETS</p><h2>오늘의 공략 키워드 <span class="count-chip">TOP10 · ${rankedIdeas.length}개</span></h2></div><span class="count-chip">${esc(data.day.replaceAll('-','/'))} 기준</span></div><p class="muted discovery-description">수집된 글 제목에서 아직 찾지 못한 키워드 챌린지 후보를 월 검색량순으로 보여드립니다.</p><div class="work-keyword-grid">${rankedIdeas.length?rankedIdeas.map(idea).join(''):empty('아직 공략할 키워드가 없습니다. 관심 분야를 선택하거나 키워드 탐색에서 글감을 보관해 주세요.')}</div></section>
 
       ${writingGuidePanel()}
       <section id="discoveryTopKeywords" class="panel work-panel">${topKeywordsContent()}</section>
