@@ -41,11 +41,10 @@
 .discovery-ideas-table td{height:72px;vertical-align:middle}
 .discovery-ideas-table td:first-child{min-width:220px}
 .discovery-ideas-table td:nth-child(2),.discovery-ideas-table td:nth-child(3),.discovery-ideas-table td:nth-child(4){white-space:nowrap}
-.discovery-ideas-table td.reason{min-width:240px;white-space:normal}
+.discovery-ideas-table td.reason{min-width:360px;white-space:nowrap}
 .discovery-idea-name{display:flex;align-items:center;gap:12px}
 .discovery-idea-name .priority-number{flex-shrink:0}
 .discovery-idea-name strong{overflow-wrap:anywhere}
-.discovery-ideas-table .button{min-height:var(--control-compact-height);padding:7px 12px;font-size:var(--font-caption);white-space:nowrap}
 .discovery-change{align-items:flex-start;flex-direction:column;gap:8px}
 .discovery-change>div{min-width:0}
 .discovery-change-label{font-size:var(--font-caption);white-space:normal}
