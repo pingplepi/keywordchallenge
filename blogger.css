@@ -37,11 +37,15 @@
 .blogger-attack-table td.reason{min-width:260px;white-space:normal}
 .discovery-ideas-table{max-width:100%;overflow-x:auto}
 .discovery-ideas-table:focus-visible{outline:3px solid #b7a3eb;outline-offset:3px}
-.discovery-ideas-table .tbl{min-width:960px}
+.discovery-ideas-table .tbl{min-width:1040px;table-layout:fixed}
+.discovery-ideas-table th:nth-child(1){width:28%}
+.discovery-ideas-table th:nth-child(2){width:12%}
+.discovery-ideas-table th:nth-child(3){width:14%}
+.discovery-ideas-table th:nth-child(4){width:16%}
+.discovery-ideas-table th:nth-child(5){width:30%}
 .discovery-ideas-table td{height:72px;vertical-align:middle}
-.discovery-ideas-table td:first-child{min-width:220px}
 .discovery-ideas-table td:nth-child(2),.discovery-ideas-table td:nth-child(3),.discovery-ideas-table td:nth-child(4){white-space:nowrap}
-.discovery-ideas-table td.reason{min-width:360px;white-space:nowrap}
+.discovery-ideas-table td.reason{white-space:nowrap}
 .discovery-idea-name{display:flex;align-items:center;gap:12px}
 .discovery-idea-name .priority-number{flex-shrink:0}
 .discovery-idea-name strong{overflow-wrap:anywhere}
