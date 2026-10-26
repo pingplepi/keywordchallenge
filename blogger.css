@@ -105,9 +105,13 @@
 
 /* Keep the blogger demand table aligned with the roomy dashboard priority tables. */
 .blogger-demand-table{min-width:0;max-width:100%;overflow-x:auto}
-.blogger-demand-table table{min-width:940px}
+.blogger-demand-table table{min-width:1040px;table-layout:fixed}
+.blogger-demand-table th:nth-child(1){width:6%}
+.blogger-demand-table th:nth-child(2){width:22%}
+.blogger-demand-table th:nth-child(3){width:12%}
+.blogger-demand-table th:nth-child(4){width:14%}
+.blogger-demand-table th:nth-child(5){width:16%}
+.blogger-demand-table th:nth-child(6){width:30%}
 .blogger-demand-table td{height:72px}
-.blogger-demand-table th:first-child,.blogger-demand-table td:first-child{width:72px}
-.blogger-demand-table th:nth-child(2),.blogger-demand-table td:nth-child(2){min-width:190px}
 .blogger-demand-table th:nth-child(3),.blogger-demand-table td:nth-child(3),.blogger-demand-table th:nth-child(4),.blogger-demand-table td:nth-child(4),.blogger-demand-table th:nth-child(5),.blogger-demand-table td:nth-child(5){white-space:nowrap}
-.blogger-demand-table .reason{min-width:245px}
+.blogger-demand-table .reason{white-space:nowrap}
