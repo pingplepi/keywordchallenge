@@ -48,8 +48,8 @@ export function createBloggerDashboard(client, {notify, onSearch}) {
   function topKeywordsContent(){
     const rows=data.opportunities;
     const table=rows.length?`<div class="table-wrap blogger-demand-table" tabindex="0" role="region" aria-label="검색량 높은 미참여 표"><table class="tbl strategy-table"><thead><tr>${['우선','키워드','분야','월 검색량','조회 일자','추천 이유'].map(label=>`<th scope="col">${label}</th>`).join('')}</tr></thead><tbody>${rows.map((row,index)=>{
-      const reasons=['확인된 월 검색량 상위',data.post_count?'수집된 글 제목에 없는 키워드':'글 수집 전 · 작성 여부 비교 전'];
-      return `<tr><td><span class="priority-number">${index+1}</span></td><td><strong class="blogger-attack-keyword">${esc(row.keyword)}</strong></td><td>${esc(row.field||'미지정')}</td><td><strong>${volume(row)}</strong></td><td>${queryDate(row.collected_at)}</td><td class="reason">${reasons.map(esc).join('<br>')}</td></tr>`;
+      const reasons=['월 검색량 상위',data.post_count?'수집된 글 제목에 없음':'글 수집 전 · 작성 여부 비교 전'];
+      return `<tr><td><span class="priority-number">${index+1}</span></td><td><strong class="blogger-attack-keyword">${esc(row.keyword)}</strong></td><td>${esc(row.field||'미지정')}</td><td><strong>${volume(row)}</strong></td><td>${queryDate(row.collected_at)}</td><td class="reason">${reasons.map(esc).join(' · ')}</td></tr>`;
     }).join('')}</tbody></table></div>`:empty('최근 30일 내 검색량이 확인된 추천 후보가 없습니다. 분야를 변경하거나 키워드 검색에서 새로운 글감을 찾아보세요.');
     return `<div class="work-section-title"><div><p class="eyebrow">KEYWORD OPPORTUNITIES</p><h2>검색량 높은 미참여 <span class="count-chip">TOP10</span></h2></div><a href="#keywordSearchView">다른 키워드 찾기 ↗</a></div><p class="muted discovery-description">${data.post_count?'수집된 글 제목에서 찾지 못한 후보를 월 검색량순으로 보여드립니다.':'아직 글을 수집하지 않아, 선택한 분야의 검색량 높은 후보를 보여드립니다.'}</p>
       <p class="message" role="status" aria-live="polite">${esc(volumeRefreshMessage())}</p>${table}
