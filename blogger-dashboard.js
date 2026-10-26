@@ -53,6 +53,7 @@ export function createBloggerDashboard(client, {notify, onSearch}) {
   let user = null, settings = null, contextKey = '', generation = 0;
   let data = null, visible = false, loading = false, loadedAt = 0, reloadAfter = false;
   let refreshTimer=null,polling=false,pollAttempts=0,readVersion=0;
+  let attackRanking=null,attackRankingLoading=false,attackRankingRequest=0;
   const saving = new Set();
   let guideKeyword='';const guideDrafts=new Map();
 
@@ -68,7 +69,7 @@ export function createBloggerDashboard(client, {notify, onSearch}) {
     return `<div class="work-card-actions"><button class="button button-light" data-discovery-action="guide" data-keyword="${esc(row.keyword)}">내 관점으로 쓰기</button><button class="button button-quiet" data-discovery-action="save" data-keyword="${esc(row.keyword)}" ${row.saved?'disabled':''}>${row.saved?'보관됨 ✓':'글감 보관'}</button><button class="work-text-button" data-discovery-action="search" data-keyword="${esc(row.keyword)}">키워드 탐색으로</button></div>`;
   }
   function idea(row, index) {
-    return `<article class="work-keyword-card discovery-idea"><div class="work-section-title"><span class="priority-number">${index+1}</span><span class="count-chip">${row.saved?'보관한 글감':esc(row.field || '관심 키워드')}</span></div><h3>${esc(row.keyword)}</h3><p class="discovery-prompt">독자와 관점을 고르고, 이 주제에서 직접 확인한 이야기를 떠올려 보세요.</p><p class="work-volume">${volume(row)}<small>월 검색량 · ${row.collected_at?`${date(row.collected_at)} 조회`:'최근 조회 기록 없음'}</small></p><small class="muted">${data.post_count?'수집된 글 제목에서 이 키워드를 찾지 못했어요.':'글 수집 전으로, 관심 분야와 보관함에서 추천합니다.'}</small>${actions(row)}</article>`;
+    return `<article class="work-keyword-card discovery-idea"><div class="work-section-title"><span class="count-chip">${row.saved?'보관한 글감':esc(row.field || '관심 키워드')}</span></div><h3>${esc(row.keyword)}</h3><p class="discovery-prompt">독자와 관점을 고르고, 이 주제에서 직접 확인한 이야기를 떠올려 보세요.</p><p class="work-volume">${volume(row)}<small>월 검색량 · ${row.collected_at?`${date(row.collected_at)} 조회`:'최근 조회 기록 없음'}</small></p><small class="muted">${data.post_count?'수집된 글 제목에서 이 키워드를 찾지 못했어요.':'글 수집 전으로, 관심 분야와 보관함에서 추천합니다.'}</small>${actions(row)}</article>`;
   }
   function metric(label, value, detail, target, type='') {
     const attr = target.startsWith('#') ? `href="${target}"` : `type="button" data-discovery-action="jump" data-section="${target}"`;
@@ -80,24 +81,36 @@ export function createBloggerDashboard(client, {notify, onSearch}) {
       <p class="message" role="status" aria-live="polite">${esc(volumeRefreshMessage())}</p><ol class="discovery-opportunities">${data.opportunities.length?data.opportunities.map((row,index)=>`<li><span class="priority-number">${index+1}</span><div class="discovery-keyword"><strong>${esc(row.keyword)}</strong><small class="muted">${esc(row.field || '내 보관함')} · 검색량 수집 ${date(row.collected_at)}</small></div><div class="discovery-volume"><strong>${volume(row)}</strong><small>월 검색량</small></div><button class="button button-light" data-discovery-action="save" data-keyword="${esc(row.keyword)}" ${row.saved?'disabled':''}>${row.saved?'보관됨 ✓':'글감 보관'}</button></li>`).join(''):''}</ol>
       ${!data.opportunities.length?empty('최근 30일 내 검색량이 확인된 추천 후보가 없습니다. 관심 분야를 확인하거나 키워드 검색에서 새로운 글감을 찾아보세요.'):''}
       <p class="catalog-footnote">추천은 공용 목록의 관심 분야 키워드와 내 보관함을 기준으로 합니다. 제목에 없더라도 과거에 작성했을 수 있습니다.</p>`;}
-function volumeRefreshMessage(){const refresh=data?.volume_refresh;if(!refresh)return '검색량의 수집 날짜를 확인해 주세요.';if(refresh.status==='fresh')return data.opportunities.length?'오늘 수집한 월 검색량을 반영했습니다.':'확인할 검색량 후보가 없습니다.';if(refresh.status==='disabled')return '검색량 자동 갱신이 일시 중지되어 마지막 수집값을 보여드립니다.';if(refresh.status==='error')return '검색량을 갱신하지 못해 마지막 수집값을 보여드립니다. 관리자가 수집 상태를 확인해야 합니다.';if(pollAttempts>=40)return '검색량 갱신이 계속되고 있습니다. 다음 접속 때 결과를 자동으로 반영합니다.';if(refresh.status==='refreshing')return '추천 후보의 검색량을 갱신 중입니다. 완료되면 이 목록에 자동으로 반영됩니다.';return '최근 검색량을 아직 확인하지 못해 마지막 수집값을 보여드립니다.';}
+  function attackRankingContent(){
+    const rows=attackRanking?.items||[];
+    const list=rows.length?`<ol class="discovery-opportunities">${rows.map((row,index)=>`<li><span class="priority-number">${index+1}</span><div class="discovery-keyword"><strong>${esc(row.keyword)}</strong><small class="muted">${esc(row.field||'관심 분야')} · 공략 점수 ${count(row.score)}점 · 키챌 참여자 ${count(row.participant_count)}명</small><small class="muted">${index===0?'1위 이유 · ':''}${(row.reasons||[]).slice(0,index===0?4:2).map(esc).join(' · ')}</small></div><div class="discovery-volume"><strong>${volume(row)}</strong><small>월 검색량</small></div><button class="button button-light" data-discovery-action="save" data-keyword="${esc(row.keyword)}" ${row.saved?'disabled':''}>${row.saved?'보관됨 ✓':'글감 보관'}</button></li>`).join('')}</ol>`:'';
+    return `<section class="panel work-panel" id="discoveryRanking"><div class="work-section-title"><div><p class="eyebrow">TODAY’S KEYWORD ATTACK</p><h2>오늘의 키워드 공략 <span class="count-chip">TOP10</span></h2></div><span class="count-chip">${esc(data.day.replaceAll('-','/'))} 기준</span></div><p class="muted discovery-description">내 블로그 주제와의 적합도, 최신 관심도, 키챌 경쟁 여지, 아직 다루지 않은 정도를 함께 반영합니다.</p>${attackRankingLoading&&!attackRanking?'<p class="message">공략 후보를 불러오는 중…</p>':list||empty('최근 글 제목에 없는 공략 후보가 없습니다. 관심 분야를 설정하거나 글 수집 후 다시 확인해 주세요.')}<p class="catalog-footnote">점수는 적합도 30%(관심 분야와 최근 글 주제 연결), 최신 관심도 25%(월 검색량), 경쟁 여지 25%(참여자 대비 수요와 참여자 수), 미다룸 정도 20%(최근 글 제목과 연결된 주제 글 수)를 반영합니다. 검색량은 최근 30일 내 수집한 네이버 월간 수치라 상승·하락 추세는 포함하지 않습니다.</p></section>`;
+  }
+  function renderAttackRanking(){const host=$('discoveryAttackRanking');if(host)host.innerHTML=attackRankingContent();}
+  async function loadAttackRanking(generationAtRequest=generation){
+    const request=++attackRankingRequest;attackRanking=null;attackRankingLoading=true;renderAttackRanking();
+    try{const result=await client.rpc('keychallenge_blogger_keyword_attack_top10');if(generationAtRequest!==generation||request!==attackRankingRequest)return;if(result.error)throw result.error;attackRanking=result.data;}
+    catch{if(generationAtRequest===generation&&request===attackRankingRequest)attackRanking=null;}
+    finally{if(generationAtRequest===generation&&request===attackRankingRequest){attackRankingLoading=false;renderAttackRanking();}}
+  }
+  function volumeRefreshMessage(){const refresh=data?.volume_refresh;if(!refresh)return '검색량의 수집 날짜를 확인해 주세요.';if(refresh.status==='fresh')return data.opportunities.length?'오늘 수집한 월 검색량을 반영했습니다.':'확인할 검색량 후보가 없습니다.';if(refresh.status==='disabled')return '검색량 자동 갱신이 일시 중지되어 마지막 수집값을 보여드립니다.';if(refresh.status==='error')return '검색량을 갱신하지 못해 마지막 수집값을 보여드립니다. 관리자가 수집 상태를 확인해야 합니다.';if(pollAttempts>=40)return '검색량 갱신이 계속되고 있습니다. 다음 접속 때 결과를 자동으로 반영합니다.';if(refresh.status==='refreshing')return '추천 후보의 검색량을 갱신 중입니다. 완료되면 이 목록에 자동으로 반영됩니다.';return '최근 검색량을 아직 확인하지 못해 마지막 수집값을 보여드립니다.';}
 function stopVolumePoll(){if(refreshTimer!==null){clearTimeout(refreshTimer);refreshTimer=null;}}
 function renderTopKeywords(){const section=$('discoveryTopKeywords');if(section)section.innerHTML=topKeywordsContent();}
 function scheduleVolumePoll(){stopVolumePoll();if(!visible||document.hidden||!data||data.volume_refresh?.status!=='refreshing'||pollAttempts>=40)return;const g=generation;refreshTimer=setTimeout(async()=>{refreshTimer=null;if(g!==generation||!visible||document.hidden)return;if(loading||polling){scheduleVolumePoll();return;}polling=true;pollAttempts++;const version=++readVersion;try{const result=await client.rpc('keychallenge_blogger_discovery_fresh',{p_enqueue:true});if(g!==generation||version!==readVersion)return;if(result.error)throw result.error;data.opportunities=result.data.opportunities;data.volume_refresh=result.data.volume_refresh;data.post_count=result.data.post_count;renderTopKeywords();}catch{if(g===generation&&version===readVersion)renderTopKeywords();}finally{if(g===generation){polling=false;scheduleVolumePoll();}}},15000);}
   function render() {
     const interest = data.interest || '관심 분야 미설정';
     const baseline = data.post_count ? `수집된 글 ${count(data.post_count)}편의 제목과 비교` : '글 수집 전 · 분야 기반 추천';
-    const rankedIdeas=[...data.ideas].sort((a,b)=>(b.volume_min??-1)-(a.volume_min??-1)||(b.volume_max??-1)-(a.volume_max??-1)||a.keyword.localeCompare(b.keyword,'ko'));
     $('discoveryOverview').innerHTML = `
       <div class="discovery-context"><div><span class="profile-chip">${esc(interest)}</span><span class="muted small">${baseline}</span></div><a href="#accountView">관심 분야 변경 ↗</a></div>
       ${!data.interest || data.interest==='기타' ? '<div class="analysis-note">내 설정에서 구체적인 관심 분야를 선택하면 분야별 추천을 받을 수 있습니다. 지금은 보관한 키워드에서 글감을 찾습니다. <a href="#accountView">분야 선택하기 ↗</a></div>' : ''}
       <div class="strategy-stats work-stats discovery-stats">
         ${metric('보관 중인 글감',data.saved_count,'내가 저장한 키워드','#savedKeywordsView')}
-        ${metric('새 글감 후보',data.opportunity_count,data.post_count?'추천 후보 중 글 제목에 없는 키워드':'글 수집 전 · 작성 여부 비교 전','discoveryIdeas','metric-purple')}
+        ${metric('새 글감 후보',data.opportunity_count,data.post_count?'추천 후보 중 글 제목에 없는 키워드':'글 수집 전 · 작성 여부 비교 전','discoveryRanking','metric-purple')}
       </div>
+      <div id="discoveryAttackRanking">${attackRankingContent()}</div>
       `;
     $('discoveryBody').innerHTML = `
-      <section id="discoveryIdeas" class="panel work-panel"><div class="work-section-title"><div><p class="eyebrow">TODAY’S KEYWORD TARGETS</p><h2>오늘의 공략 키워드 <span class="count-chip">TOP10 · ${rankedIdeas.length}개</span></h2></div><span class="count-chip">${esc(data.day.replaceAll('-','/'))} 기준</span></div><p class="muted discovery-description">수집된 글 제목에서 아직 찾지 못한 키워드 챌린지 후보를 월 검색량순으로 보여드립니다.</p><div class="work-keyword-grid">${rankedIdeas.length?rankedIdeas.map(idea).join(''):empty('아직 공략할 키워드가 없습니다. 관심 분야를 선택하거나 키워드 탐색에서 글감을 보관해 주세요.')}</div></section>
+      <section id="discoveryIdeas" class="panel work-panel"><div class="work-section-title"><div><p class="eyebrow">TODAY’S IDEAS</p><h2>오늘의 추천 글감 <span class="count-chip">${data.ideas.length}개</span></h2></div><span class="count-chip">${esc(data.day.replaceAll('-','/'))} 기준</span></div><p class="muted discovery-description">관심 분야와 보관한 키워드에서 글감을 고르고 ‘내 관점으로 쓰기’를 눌러 보세요.</p><div class="work-keyword-grid">${data.ideas.length?data.ideas.map(idea).join(''):empty('아직 추천할 글감이 없습니다. 관심 분야를 선택하거나 키워드 검색에서 글감을 보관해 주세요.')}</div></section>
 
       ${writingGuidePanel()}
       <section id="discoveryTopKeywords" class="panel work-panel">${topKeywordsContent()}</section>
@@ -161,7 +174,7 @@ function scheduleVolumePoll(){stopVolumePoll();if(!visible||document.hidden||!da
       const result = await client.rpc('keychallenge_blogger_discovery_fresh',{p_enqueue:true});
       if (g !== generation) return;
       if (result.error) throw result.error;
-      data = result.data; loadedAt = Date.now(); render(); scheduleVolumePoll();
+      data = result.data; loadedAt = Date.now(); render(); void loadAttackRanking(g); scheduleVolumePoll();
       $('discoveryStatus').textContent = '';
     } catch (error) {
       if (g !== generation) return;
@@ -211,7 +224,7 @@ function scheduleVolumePoll(){stopVolumePoll();if(!visible||document.hidden||!da
       user = nextUser; settings = nextSettings;
       opportunities.setContext(user,settings);
       if (key === contextKey) return;
-      contextKey = key; generation++; readVersion++; stopVolumePoll();polling=false;pollAttempts=0; guideKeyword='';guideDrafts.clear();data = null; loadedAt = 0; loading = false; reloadAfter = false; saving.clear();
+      contextKey = key; generation++; attackRankingRequest++; attackRanking=null; attackRankingLoading=false; readVersion++; stopVolumePoll();polling=false;pollAttempts=0; guideKeyword='';guideDrafts.clear();data = null; loadedAt = 0; loading = false; reloadAfter = false; saving.clear();
       $('discoveryOverview').innerHTML = ''; $('discoveryBody').innerHTML = ''; $('discoveryStatus').textContent = '';
       root.querySelector('[data-discovery-action="refresh"]').disabled = false;
     },
