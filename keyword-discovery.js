@@ -2,9 +2,13 @@
 const recommendationViews=new Map();
 let discoveryHost=null;
 export function mountKeywordRecommendations(view){
-  const shortcut=document.createElement('div');shortcut.className='keyword-explore-shortcut';
-  shortcut.innerHTML='<a class="button button-light" href="#keywordSearchView" data-keyword-discovery-target="personal">나에게 맞는 키워드 찾기 →</a>';
-  view.root.replaceWith(shortcut);recommendationViews.set(view.mode,view);
+  if(view.mode==='blogger')view.root.remove();
+  else{
+    const shortcut=document.createElement('div');shortcut.className='keyword-explore-shortcut';
+    shortcut.innerHTML='<a class="button button-light" href="#keywordSearchView" data-keyword-discovery-target="personal">나에게 맞는 키워드 찾기 →</a>';
+    view.root.replaceWith(shortcut);
+  }
+  recommendationViews.set(view.mode,view);
   discoveryHost?.sync();
   return {refresh(){discoveryHost?.sync();}};
 }
