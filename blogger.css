@@ -23,6 +23,7 @@
 .discovery-volume{text-align:right;font-size:var(--font-body);font-variant-numeric:tabular-nums}
 .discovery-volume small{color:var(--muted)}
 .discovery-opportunities .button{min-height:var(--control-compact-height);padding:7px 12px;font-size:var(--font-caption)}
+.discovery-row-actions{display:flex;align-items:center;justify-content:flex-end;gap:6px;flex-wrap:wrap}
 .discovery-change{align-items:flex-start;flex-direction:column;gap:8px}
 .discovery-change>div{min-width:0}
 .discovery-change-label{font-size:var(--font-caption);white-space:normal}
@@ -36,7 +37,8 @@
 @media(max-width:700px){
  .discovery-opportunities li{grid-template-columns:24px minmax(0,1fr) auto;gap:10px 12px}
  .discovery-opportunities .button{grid-column:2/-1;justify-self:start;min-height:44px}
- .discovery-idea .work-card-actions .button,.discovery-idea .work-text-button{min-height:44px}
+ .discovery-row-actions{grid-column:2/-1;justify-content:flex-start}
+ .discovery-row-actions .button,.discovery-row-actions .work-text-button{min-height:44px}
  .discovery-stats .metric>strong{font-size:var(--font-metric)}
  .discovery-method summary{min-height:44px}
 }
