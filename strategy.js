@@ -35,7 +35,7 @@ export function createStrategy(client) {
         <div id="strategyDetailRows"></div><div class="pagination"><button id="detailPrev" class="button button-light">이전</button><span id="detailPage"></span><button id="detailNext" class="button button-light">다음</button></div>
         <p class="catalog-footnote">검색량을 모르는 키워드는 ‘미수집’으로 표시하며, 검색량 범위 필터에서는 제외합니다. 미참여는 참여 가능 여부를 뜻하지 않습니다.</p>
       </details>
-      <section class="panel strategy-panel"><div class="section-heading"><div><p class="eyebrow">NEW CONTENT OPPORTUNITIES</p><h2>검색량 높은 미참여 <span class="count-chip">TOP10</span></h2><p id="strategyVolumeNote" class="muted"></p></div></div><div id="strategyDemand"></div></section>
+      <section class="panel strategy-panel"><div class="section-heading"><div><p class="eyebrow">NEW CONTENT OPPORTUNITIES</p><h2>검색량 높은 미참여 <span class="count-chip">TOP10</span></h2><p id="strategyVolumeNote" class="muted"></p></div></div><div id="strategyDemand"></div><details class="score-note"><summary>추천 순위는 어떻게 정하나요?</summary><p>선택한 분야에서 최근 수집한 내 참여 목록에 없는 키워드 중, 검색량이 확인된 후보를 월 PC·모바일 검색량 합계가 높은 순으로 최대 10개 보여드립니다. 참여자 수는 비교를 위한 참고 정보입니다.</p></details></section>
     </div>
     <dialog id="keywordDialog" class="keyword-dialog"><div class="dialog-head"><p class="eyebrow">KEYWORD DETAIL</p><button id="closeKeyword" class="button button-light" aria-label="키워드 상세 닫기">닫기</button></div><div id="keywordDetail"></div></dialog>`;
 
@@ -70,7 +70,7 @@ export function createStrategy(client) {
     $('strategyMovementStats').innerHTML=[['비교 키챌','compared'],['상승','up'],['하락','down'],['신규 TOP3','new_top3'],['TOP3 이탈','left_top3']].map(([label,key])=>`<div><span>${label}</span><strong>${num(data.movement?.[key])}</strong></div>`).join('');
     renderMovers();
     $('strategyVolumeNote').textContent=`검색량이 확인된 ${num(data.volume_covered)} / ${num(data.total)}개 키워드에서 미참여 후보를 찾습니다. 네이버 검색광고의 월 PC+모바일 검색량 기준입니다.`;
-    $('strategyDemand').innerHTML=!data.complete?empty('참여 키워드를 끝까지 수집해야 미참여 후보를 정확히 구분할 수 있습니다.'):data.demand.length?table(['우선','키챌명','분야','월 검색량','참여자','추천 이유'],data.demand.map((row,i)=>`<tr><td>${i+1}</td><td>${keywordButton(row)}</td><td>${esc(row.field)}</td><td><strong>${volume(row)}</strong></td><td>${num(row.participant_count)}</td><td class="reason">미참여 · 확인된 검색량 상위${row.participant_count!==null?` · 참여자 ${num(row.participant_count)}명`:''}</td></tr>`).join('')):empty(data.volume_covered?'검색량이 확인된 미참여 후보가 아직 없습니다.':'월 검색량 수집을 기다리고 있습니다. 관리자 연결이 완료되면 실제 검색량으로 채워집니다.');
+    $('strategyDemand').innerHTML=!data.complete?empty('참여 키워드를 끝까지 수집해야 미참여 후보를 정확히 구분할 수 있습니다.'):data.demand.length?table(['우선','키챌명','분야','참여자','월 검색량','추천 이유'],data.demand.map((row,i)=>`<tr><td><span class="priority-number">${i+1}</span></td><td>${keywordButton(row)}</td><td>${esc(row.field)}</td><td>${num(row.participant_count)}</td><td><strong>${volume(row)}</strong></td><td class="reason">미참여 · 확인된 검색량 상위${row.participant_count!==null?` · 참여자 ${num(row.participant_count)}명`:''}</td></tr>`).join('')):empty(data.volume_covered?'검색량이 확인된 미참여 후보가 아직 없습니다.':'월 검색량 수집을 기다리고 있습니다. 관리자 연결이 완료되면 실제 검색량으로 채워집니다.');
   }
   async function refresh() {
     if(!profile||!user)return;
