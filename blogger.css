@@ -28,8 +28,8 @@
 .blogger-attack-table .tbl{min-width:920px}
 .blogger-attack-table th{background:#faf9fc}
 .blogger-attack-table td{vertical-align:middle}
-/* Keep both daily attack tables equally roomy, including two-line reasons. */
-#strategyAttack .strategy-table td,.blogger-attack-table td{height:72px}
+/* Keep priority tables equally roomy, including two-line reasons. */
+#strategyAttack .strategy-table td,#strategyDemand .strategy-table td,.blogger-attack-table td{height:72px}
 /* Match the influencer keyword button's vertical space without adding a fake button. */
 .blogger-attack-keyword{display:inline-block;min-width:90px;padding:3px 0;font-weight:700}
 #discoveryRanking .section-heading{flex-wrap:wrap}
