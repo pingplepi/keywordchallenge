@@ -2,7 +2,6 @@ import { createKeywordOpportunities } from './keyword-opportunities.js';
 const $ = id => document.getElementById(id);
 const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const count = value => Number(value || 0).toLocaleString('ko-KR');
-const date = value => value ? new Date(value).toLocaleDateString('ko-KR', {timeZone:'Asia/Seoul',month:'numeric',day:'numeric'}) : '—';
 const queryDate = value => value && !Number.isNaN(new Date(value).getTime()) ? new Date(value).toLocaleDateString('sv-SE', {timeZone:'Asia/Seoul',year:'numeric',month:'2-digit',day:'2-digit'}).replaceAll('-','/') : '미조회';
 const volume = row => row.volume_min == null ? '미확인' : row.volume_min === row.volume_max ? count(row.volume_min) : `${count(row.volume_min)}–${count(row.volume_max)}`;
 const empty = text => `<div class="work-empty">${esc(text)}</div>`;
@@ -49,10 +48,16 @@ export function createBloggerDashboard(client, {notify, onSearch}) {
     return `<${tag} ${attr} class="panel metric ${type}"><span>${label}</span><strong>${count(value)}<span class="discovery-unit">개</span></strong><small>${detail}</small></${tag}>`;
   }
 
-  function topKeywordsContent(){return `<div class="work-section-title"><div><p class="eyebrow">KEYWORD OPPORTUNITIES</p><h2>검색량 높은 새 글감 <span class="count-chip">TOP10</span></h2></div><a href="#keywordSearchView">다른 키워드 찾기 ↗</a></div><p class="muted discovery-description">${data.post_count?'수집된 글 제목에서 찾지 못한 후보를 월 검색량순으로 보여드립니다.':'아직 글을 수집하지 않아, 선택한 분야의 검색량 높은 후보를 보여드립니다.'}</p>
-      <p class="message" role="status" aria-live="polite">${esc(volumeRefreshMessage())}</p><ol class="discovery-opportunities">${data.opportunities.length?data.opportunities.map((row,index)=>`<li><span class="priority-number">${index+1}</span><div class="discovery-keyword"><strong>${esc(row.keyword)}</strong><small class="muted">${esc(row.field || '내 보관함')} · 검색량 수집 ${date(row.collected_at)}</small></div><div class="discovery-volume"><strong>${volume(row)}</strong><small>월 검색량</small></div><button class="button button-light" data-discovery-action="save" data-keyword="${esc(row.keyword)}" ${row.saved?'disabled':''}>${row.saved?'보관됨 ✓':'글감 보관'}</button></li>`).join(''):''}</ol>
-      ${!data.opportunities.length?empty('최근 30일 내 검색량이 확인된 추천 후보가 없습니다. 분야를 변경하거나 키워드 검색에서 새로운 글감을 찾아보세요.'):''}
-      <p class="catalog-footnote">추천은 선택한 분야의 공용 키워드와 보관 글감을 기준으로 합니다. 제목에 없더라도 과거에 작성했을 수 있습니다.</p>`;}
+  function topKeywordsContent(){
+    const rows=data.opportunities;
+    const table=rows.length?`<div class="table-wrap blogger-demand-table" tabindex="0" role="region" aria-label="검색량 높은 미참여 표"><table class="tbl strategy-table"><thead><tr>${['우선','키워드','분야','월 검색량','조회 일자','추천 이유'].map(label=>`<th scope="col">${label}</th>`).join('')}</tr></thead><tbody>${rows.map((row,index)=>{
+      const reasons=['확인된 월 검색량 상위',data.post_count?'수집된 글 제목에 없는 키워드':'글 수집 전 · 작성 여부 비교 전'];
+      return `<tr><td><span class="priority-number">${index+1}</span></td><td><strong class="blogger-attack-keyword">${esc(row.keyword)}</strong></td><td>${esc(row.field||'미지정')}</td><td><strong>${volume(row)}</strong></td><td>${queryDate(row.collected_at)}</td><td class="reason">${reasons.map(esc).join('<br>')}</td></tr>`;
+    }).join('')}</tbody></table></div>`:empty('최근 30일 내 검색량이 확인된 추천 후보가 없습니다. 분야를 변경하거나 키워드 검색에서 새로운 글감을 찾아보세요.');
+    return `<div class="work-section-title"><div><p class="eyebrow">KEYWORD OPPORTUNITIES</p><h2>검색량 높은 미참여 <span class="count-chip">TOP10</span></h2></div><a href="#keywordSearchView">다른 키워드 찾기 ↗</a></div><p class="muted discovery-description">${data.post_count?'수집된 글 제목에서 찾지 못한 후보를 월 검색량순으로 보여드립니다.':'아직 글을 수집하지 않아, 선택한 분야의 검색량 높은 후보를 보여드립니다.'}</p>
+      <p class="message" role="status" aria-live="polite">${esc(volumeRefreshMessage())}</p>${table}
+      <p class="catalog-footnote">‘미참여’는 수집된 글 제목에 없는 후보를 뜻하며, 본문이나 과거 전체 글의 작성 여부를 확인한 결과는 아닙니다. 조회 일자는 네이버 월 검색량을 수집한 날짜입니다.</p>`;
+  }
   function attackRankingContent(){
     const rows=attackRanking?.items||[];
     const table=rows.length?`<div class="table-wrap blogger-attack-table"><table class="tbl strategy-table"><thead><tr><th>우선</th><th>키워드</th><th>분야</th><th>참여자</th><th>월 검색량</th><th>점수</th><th>공략 이유</th></tr></thead><tbody>${rows.map((row,index)=>`<tr><td><span class="priority-number">${index+1}</span></td><td><strong class="blogger-attack-keyword">${esc(row.keyword)}</strong></td><td>${esc(row.field||'관심 분야')}</td><td>${count(row.participant_count)}명</td><td>${volume(row)}</td><td><strong>${count(row.score)}점</strong></td><td class="reason">${[row.reasons?.[0],row.reasons?.[3]].filter(Boolean).map(esc).join(' · ')}</td></tr>`).join('')}</tbody></table></div>`:'';
