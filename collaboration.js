@@ -1,4 +1,5 @@
 import { blankCollaboration, extractCollaboration, readGuideFile, sumMoney, outstanding, STATUS, KINDS } from './collaboration-import.js';
+import { EVENT_TYPES, monthDays, moveMonth, calendarEvents } from './collaboration-calendar.js';
 
 const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const won = value => `${Number(value || 0).toLocaleString('ko-KR')}원`;
@@ -30,6 +31,8 @@ export function createCollaborationManager(client) {
   let view = 'active', query = '', statusFilter = '', page = 1, notice = '', noticeError = false;
   let draft = null, evidence = [], warnings = [], history = [], reminders = [], tab = 'basic', dirty = false, busy = false, modalMode = '';
   let importSourceName = '', adminBusy = false;
+  let reviewRequired = false, reviewConfirmed = false;
+  let calendarMonth = today().slice(0, 7), calendarDay = today();
   const report = (message, error = false) => { notice = message; noticeError = error; render(); };
 
   async function load() {
@@ -62,26 +65,56 @@ export function createCollaborationManager(client) {
       <section class="panel collab-list-panel"><div class="collab-list-heading"><div class="collab-view-tabs" role="group" aria-label="협업 보기">${[['active','진행 중'],['schedule','일정 모아보기'],['history','완료·취소'],['trash','휴지통']].map(([key,label]) => `<button class="button ${view === key ? '' : 'button-light'}" data-view="${key}" aria-pressed="${view === key}">${label}</button>`).join('')}</div><button class="button button-quiet" data-action="refresh" ${loading ? 'disabled' : ''}>${loading ? '불러오는 중…' : '새로고침'}</button></div>
       <div class="collab-filters"><label>협업 찾기<input type="search" id="collabSearch" value="${esc(query)}" maxlength="100" placeholder="업체명, 협업명, 담당자 검색" /></label><label>진행 상태<select id="collabStatusFilter"><option value="">전체</option>${Object.entries(STATUS).map(([k,v]) => `<option value="${k}" ${k===statusFilter?'selected':''}>${v}</option>`).join('')}</select></label></div>
       <p class="collab-notice ${noticeError?'error':''}" role="status">${esc(notice)}</p><div id="collabListResults"></div></section>
+      <section id="collabCalendar" class="panel collab-calendar-panel" aria-label="협업 일정 달력" ${['active','schedule'].includes(view)?'':'hidden'}></section>
       <p class="collab-footnote">협업 정보는 내 계정에만 저장됩니다. 현금 입금과 지출은 기록한 금액 기준이며, 제품·서비스 제공가와 합산하지 않습니다.</p>`;
     renderResults();
   }
   function renderResults() {
     const target = root.querySelector('#collabListResults'); if (!target) return;
+    renderCalendar();
     const filtered = rows.filter(r => (view==='trash' ? Boolean(r.deleted_at) : !r.deleted_at && (view==='history' ? !active(r) : view==='schedule' || active(r)))
       && (!statusFilter || r.status===statusFilter) && `${r.company} ${r.title} ${r.contact} ${r.channel}`.toLocaleLowerCase().includes(query.toLocaleLowerCase()));
     if (loading && !loaded) { target.innerHTML = '<div class="collab-empty" aria-busy="true">협업 목록을 불러오고 있습니다.</div>'; return; }
+    if (view === 'schedule') {
+      target.innerHTML = '<p class="muted small">아래 달력에서 날짜를 선택하면 해당 일정을 모두 볼 수 있습니다. 완료한 일정도 함께 표시하며, 취소·휴지통 기록은 제외합니다.</p>'; return;
+    }
     if (!filtered.length) {
       target.innerHTML = `<div class="collab-empty"><span class="collab-empty-mark" aria-hidden="true">✦</span><h2>${query || statusFilter ? '조건에 맞는 협업이 없어요' : view==='active' ? '첫 협업을 등록해 보세요' : '아직 기록이 없어요'}</h2><p>${view==='active' && !query && !statusFilter ? '협업 메일을 붙여넣거나 가이드 파일을 올리면<br>업체명·조건·일정·금액을 초안으로 정리해 드립니다.' : '등록한 협업의 진행 상태와 일정을 여기서 확인할 수 있습니다.'}</p>${view==='active'&&!query&&!statusFilter?'<button class="button button-light" data-action="import">메일·가이드로 시작하기</button>':''}</div>`; return;
     }
-    if (view === 'schedule') {
-      const events = filtered.flatMap(eventsFor).sort((a,b) => a.date.localeCompare(b.date));
-      target.innerHTML = events.length ? `<p class="muted small">미완료 일정 ${events.length}건 · 한국시간 기준 · 지난 일정도 완료 처리 전까지 표시합니다.</p><div class="collab-calendar-list">${events.map(e => `<button class="collab-calendar-event" data-open="${e.row.id}"><span class="${e.date<today()?'collab-overdue':''}">${dateOnly(e.date)}${e.time?`<small>${esc(e.time)}</small>`:''}</span><div><strong>${esc(e.label)}</strong><p>${esc(e.row.company)} · ${esc(e.row.title)}</p></div><span>${e.date<today()?'기한 지남':e.date===today()?'오늘':'예정'} ↗</span></button>`).join('')}</div>` : '<div class="collab-empty">등록된 미완료 일정이 없습니다. 협업에서 날짜를 추가해 보세요.</div>'; return;
-    }
     const pages = Math.max(1, Math.ceil(filtered.length/20)); page = Math.min(page,pages);
-    target.innerHTML = `<p class="muted small">${filtered.length}건의 협업</p><div class="table-wrap collab-table-wrap" tabindex="0" aria-label="협업 목록, 좁은 화면에서 좌우 스크롤"><table class="collab-table"><thead><tr><th>협업</th><th>진행 상태</th><th>결과물</th><th>다가오는 일정</th><th>원고료 · 정산</th><th>관리</th></tr></thead><tbody>${filtered.slice((page-1)*20,page*20).map(r => {
+    target.innerHTML = `<p class="muted small">${filtered.length}건의 협업</p><div class="table-wrap collab-table-wrap" tabindex="0" aria-label="협업 목록, 좁은 화면에서 좌우 스크롤"><table class="collab-table"><thead><tr><th>협업</th><th>진행 상태</th><th>결과물</th><th>다가오는 일정</th><th>제공가 · 지출</th><th>원고료 · 정산</th><th>관리</th></tr></thead><tbody>${filtered.slice((page-1)*20,page*20).map(r => {
       const e = eventsFor(r)[0], published = r.deliverables.filter(d => d.status==='published').length;
-      return `<tr><td><button class="collab-title-button" data-open="${r.id}">${esc(r.title)}</button><span class="collab-cell-sub">${esc(r.company || '업체명 미입력')}${r.channel?` · ${esc(r.channel)}`:''}</span></td><td><span class="collab-badge collab-status-${r.status}">${STATUS[r.status]}</span></td><td><strong>${published} / ${r.deliverables.length}</strong><span class="collab-cell-sub">${r.deliverables.length?'발행 완료':'결과물 미등록'}</span></td><td>${e?`<span class="${e.date<today()?'collab-overdue':''}">${dateOnly(e.date)}</span><span class="collab-cell-sub">${esc(e.label)}</span>`:'<span class="muted">등록된 일정 없음</span>'}</td><td><strong>${won(r.cash_fee)}</strong><span class="collab-cell-sub ${outstanding(r)?'collab-overdue':''}">${outstanding(r)?`미입금 ${won(outstanding(r))}`:Number(r.cash_fee)>0?'입금 완료':'현금 원고료 없음'}</span></td><td><button class="button button-light" data-open="${r.id}">${view==='trash'?'기록 보기':'상세·수정'}</button></td></tr>`;
+      return `<tr><td><button class="collab-title-button" data-open="${r.id}">${esc(r.title)}</button><span class="collab-cell-sub">${esc(r.company || '업체명 미입력')}${r.channel?` · ${esc(r.channel)}`:''}</span></td><td><span class="collab-badge collab-status-${r.status}">${STATUS[r.status]}</span></td><td><strong>${published} / ${r.deliverables.length}</strong><span class="collab-cell-sub">${r.deliverables.length?'발행 완료':'결과물 미등록'}</span></td><td>${e?`<span class="${e.date<today()?'collab-overdue':''}">${dateOnly(e.date)}</span><span class="collab-cell-sub">${esc(e.label)}</span>`:'<span class="muted">등록된 일정 없음</span>'}</td><td><span class="collab-money-line">제공가 <strong>${won(r.provided_value)}</strong></span><span class="collab-cell-sub">지출 ${won(sumMoney(r.expenses))}</span></td><td><strong>${won(r.cash_fee)}</strong><span class="collab-cell-sub ${outstanding(r)?'collab-overdue':''}">${outstanding(r)?`미입금 ${won(outstanding(r))}`:Number(r.cash_fee)>0?'입금 완료':'현금 원고료 없음'}</span></td><td><button class="button button-light" data-open="${r.id}">${view==='trash'?'기록 보기':'상세·수정'}</button></td></tr>`;
     }).join('')}</tbody></table></div><div class="pagination"><button class="button button-light" data-page="${page-1}" ${page<=1?'disabled':''}>이전</button><span>${page} / ${pages}</span><button class="button button-light" data-page="${page+1}" ${page>=pages?'disabled':''}>다음</button></div>`;
+  }
+  function renderCalendar(focusSelector = '') {
+    const target = root.querySelector('#collabCalendar');
+    if (!target || target.hidden) return;
+    if (loading && !loaded) { target.innerHTML = '<p class="muted" aria-busy="true">달력을 불러오고 있습니다.</p>'; return; }
+    const events = rows.filter(r => (!statusFilter || r.status===statusFilter) && `${r.company} ${r.title} ${r.contact} ${r.channel}`.toLocaleLowerCase().includes(query.toLocaleLowerCase()))
+      .flatMap(calendarEvents).sort((a,b) => a.date.localeCompare(b.date) || (a.time||'').localeCompare(b.time||'') || a.row.title.localeCompare(b.row.title));
+    const byDay = new Map();
+    for (const event of events) { if (!byDay.has(event.date)) byDay.set(event.date, []); byDay.get(event.date).push(event); }
+    const currentDay = today(), [year, month] = calendarMonth.split('-');
+    const selected = byDay.get(calendarDay) || [];
+    const monthCount = events.filter(e => e.date.startsWith(calendarMonth)).length;
+    const shortDate = date => `${Number(date.slice(5,7))}월 ${Number(date.slice(8))}일`;
+    target.innerHTML = `<div class="collab-calendar-heading"><div><p class="eyebrow">COLLABORATION CALENDAR</p><h2>협업 일정 달력</h2><p class="muted small">날짜를 눌러 일정을 확인하고, 협업을 열어 바로 수정하세요.</p></div><div class="collab-month-nav"><button type="button" class="button button-light" data-month="-1" aria-label="이전 달" ${calendarMonth==='1900-01'?'disabled':''}>‹</button><h3 aria-live="polite">${year}년 ${Number(month)}월</h3><button type="button" class="button button-light" data-month="1" aria-label="다음 달" ${calendarMonth==='2100-12'?'disabled':''}>›</button><button type="button" class="button button-quiet" data-calendar-today>오늘</button></div></div>
+      <div class="collab-calendar-legend">${Object.entries(EVENT_TYPES).map(([key,label])=>`<span class="collab-event-tone-${key}"><i aria-hidden="true"></i>${label}</span>`).join('')}<span class="collab-calendar-complete">완료한 일정은 연하게 표시</span></div>
+      <p class="collab-calendar-caption">이번 달 ${monthCount}건${query||statusFilter?' · 검색 조건 적용':''} · 한국시간 기준</p>
+      <div class="collab-month-grid" role="group" aria-label="${year}년 ${Number(month)}월 달력">
+        ${['일','월','화','수','목','금','토'].map((day,i)=>`<div class="collab-weekday ${i===0?'is-sunday':i===6?'is-saturday':''}">${day}</div>`).join('')}
+        ${monthDays(calendarMonth).map(day=>{
+          const daily = byDay.get(day.date) || [];
+          return `<div class="collab-day ${day.inMonth?'':'is-outside'} ${day.date===currentDay?'is-today':''} ${day.date===calendarDay?'is-selected':''}">
+            <button type="button" class="collab-day-select" data-calendar-day="${day.date}" aria-label="${dateOnly(day.date)}, 일정 ${daily.length}건${day.date===currentDay?', 오늘':''}" aria-pressed="${day.date===calendarDay}" ${day.date===currentDay?'aria-current="date"':''}><span>${day.day}</span><small>${daily.length?`${daily.length}건`:''}</small></button>
+            <div class="collab-day-events">${daily.slice(0,3).map(event=>`<button type="button" class="collab-calendar-chip collab-event-tone-${event.type} ${event.done?'is-done':''}" data-open="${esc(event.row.id)}" title="${esc(`${event.label} · ${event.row.company || event.row.title} · ${event.row.title}${event.time?` · ${event.time}`:''}${event.done?' · 완료':''}`)}"><span class="collab-chip-type">${esc(event.time || EVENT_TYPES[event.type])}</span><span>${esc(event.row.company || event.row.title)}</span>${event.done?'<span class="collab-chip-done">완료</span>':''}</button>`).join('')}${daily.length>3?`<button type="button" class="collab-more-events" data-calendar-day="${day.date}">＋ ${daily.length-3}건 더 보기</button>`:''}</div>
+            <div class="collab-day-dots" aria-hidden="true">${[...new Set(daily.map(e=>e.type))].map(type=>`<i class="collab-event-tone-${type}"></i>`).join('')}</div>
+          </div>`;
+        }).join('')}</div>
+      <div class="collab-selected-day"><div class="collab-section-heading"><h3>${shortDate(calendarDay)} 일정 <span>${selected.length}건</span></h3><span class="muted small">협업을 누르면 상세 화면이 열립니다.</span></div>
+      ${selected.length?`<div class="collab-calendar-list">${selected.map(event=>`<button type="button" class="collab-calendar-event ${event.done?'is-done':''}" data-open="${esc(event.row.id)}"><span class="collab-event-tone-${event.type}"><strong>${esc(EVENT_TYPES[event.type])}</strong>${event.time?`<small>${esc(event.time)}</small>`:''}</span><div><strong>${esc(event.row.title)}</strong><p>${esc(event.row.company || '업체명 미입력')}${event.type==='output'?` · ${esc(event.label)}`:''}</p></div><span class="${!event.done&&event.date<currentDay?'collab-overdue':''}">${event.done?'완료':event.date<currentDay?'기한 지남':event.date===currentDay?'오늘':'예정'} ↗</span></button>`).join('')}</div>`:'<p class="collab-calendar-no-events">등록된 일정이 없습니다. 협업의 일정·알림이나 결과물에서 날짜를 등록해 주세요.</p>'}</div>`;
+    if (focusSelector) target.querySelector(focusSelector)?.focus({preventScroll:true});
   }
   function showDialog() { if (!dialog.open) dialog.showModal(); }
   async function loadEditor(id) {
@@ -101,6 +134,7 @@ export function createCollaborationManager(client) {
   }
   async function openEditor(row = null, imported = null) {
     modalMode='editor'; draft=structuredClone(row || imported?.draft || blankCollaboration()); evidence=imported?.evidence || []; warnings=imported?.warnings || []; tab='basic'; history=[]; reminders=[]; dirty=!!imported; busy=false;
+    reviewRequired=Boolean(imported); reviewConfirmed=false;
     if (!row && !draft.deliverables.length) draft.deliverables.push({id:crypto.randomUUID(),kind:'blog',name:'블로그 글',status:'preparing',due_on:'',url:''});
     renderEditor(); showDialog();
     if (row) {
@@ -127,7 +161,7 @@ export function createCollaborationManager(client) {
       <section id="collabPane-outputs" role="tabpanel" aria-labelledby="collabTab-outputs" ${tab==='outputs'?'':'hidden'}><div class="collab-section-heading"><div><h3>결과물별 진행 상황</h3><p class="muted">블로그 글과 릴스를 각각 등록하고 게시 링크를 남겨 주세요.</p></div><button type="button" class="button button-light" data-add-output ${draft.deliverables.length>=20?'disabled':''}>＋ 결과물</button></div><div class="collab-output-list">${draft.deliverables.map((d,i)=>`<div class="collab-output-card" data-output="${i}"><div class="collab-section-heading"><strong>결과물 ${i+1}</strong><button type="button" class="button button-quiet" data-remove-output="${i}">삭제</button></div><div class="collab-form-grid"><label>종류<select data-key="kind">${Object.entries(KINDS).map(([k,v])=>`<option value="${k}" ${d.kind===k?'selected':''}>${v}</option>`).join('')}</select></label><label>결과물 이름<input data-key="name" value="${esc(d.name)}" maxlength="160" /></label><label>진행 상태<select data-key="status">${Object.entries(STATUS).filter(([k])=>!['completed','cancelled'].includes(k)).map(([k,v])=>`<option value="${k}" ${d.status===k?'selected':''}>${v}</option>`).join('')}</select></label><label>발행 마감일<input type="date" data-key="due_on" value="${esc(d.due_on)}" /></label><label class="collab-span">게시 링크<input type="url" data-key="url" value="${esc(d.url)}" maxlength="2000" placeholder="https://" /></label></div>${safeUrl(d.url)?`<a href="${esc(safeUrl(d.url))}" target="_blank" rel="noopener noreferrer">게시물 보기 ↗</a>`:''}</div>`).join('') || '<p class="muted">등록된 결과물이 없습니다. 위 버튼으로 추가해 주세요.</p>'}</div></section>
       <section id="collabPane-money" role="tabpanel" aria-labelledby="collabTab-money" ${tab==='money'?'':'hidden'}><div class="collab-form-grid"><label>약정 현금 원고료 · 원<input name="cash_fee" type="number" min="0" max="99999999999" step="1" value="${draft.cash_fee}" /></label><label>제품·서비스 제공가 · 원<input name="provided_value" type="number" min="0" max="99999999999" step="1" value="${draft.provided_value}" /></label></div><label class="collab-deduction">공제액 · 원천징수 등 · 원<input name="deductions" type="number" min="0" max="99999999999" step="1" value="${draft.deductions || 0}" /></label><p class="muted small">약정 원고료는 합의한 금액, 입금 내역은 실제 받은 금액을 적어 주세요. 원천징수 등 실제 공제된 금액은 공제액에 입력해 주세요. 세액은 자동 계산하지 않습니다.</p><div class="collab-money-summary" id="collabMoneySummary"></div>${ledgerHtml('payments','입금 내역')}${ledgerHtml('expenses','지출 내역')}<p class="muted small">제품·서비스 제공가는 현금 입금·미입금·현금 잔액 계산에 포함되지 않습니다.</p></section>
       <section id="collabPane-notes" role="tabpanel" aria-labelledby="collabTab-notes" ${tab==='notes'?'':'hidden'}>${area('memo','메모',5)}${draft.source_text?`<details><summary>가져온 원문${draft.source_name?` · ${esc(draft.source_name)}`:''}</summary><pre class="collab-source">${esc(draft.source_text)}</pre></details>`:''}<h3>변경 이력</h3><ul class="collab-log">${history.map(h=>`<li>${dateTime(h.happened_at)}<span>${historyLabel(h)}</span></li>`).join('') || '<li>저장 후 변경 이력이 기록됩니다.</li>'}</ul></section>
-      <p id="collabDialogMessage" class="collab-dialog-message" role="status"></p></div><div class="collab-dialog-footer">${draft.id?`<button type="button" class="button button-quiet" data-trash>${draft.deleted_at?'휴지통에서 복원':'휴지통으로 이동'}</button>`:'<span></span>'}<div class="collab-actions"><button type="button" class="button button-quiet" data-close>취소</button><button type="submit" class="button">${draft.id?'변경 저장':'협업 저장'}</button></div></div></form>`;
+      <p id="collabDialogMessage" class="collab-dialog-message" role="status"></p></div>${reviewRequired?`<div class="collab-save-review"><strong>날짜와 금액은 저장 전에 꼭 확인해 주세요.</strong><p>자동 분류된 내용이 원문과 다를 수 있습니다.</p><div class="collab-review-actions"><button type="button" data-tab="schedule">일정 확인 ↗</button><button type="button" data-tab="money">금액 확인 ↗</button></div><label class="collab-checkbox"><input id="collabImportConfirmed" type="checkbox" required ${reviewConfirmed?'checked':''} />날짜와 금액을 원문과 비교해 확인했습니다.</label></div>`:''}<div class="collab-dialog-footer">${draft.id?`<button type="button" class="button button-quiet" data-trash>${draft.deleted_at?'휴지통에서 복원':'휴지통으로 이동'}</button>`:'<span></span>'}<div class="collab-actions"><button type="button" class="button button-quiet" data-close>취소</button><button type="submit" class="button">${draft.id?'변경 저장':'협업 저장'}</button></div></div></form>`;
     updateMoney();
   }
   function ledgerHtml(key,label) {
@@ -157,6 +191,10 @@ export function createCollaborationManager(client) {
   async function save({trash=false}={}) {
     if(busy||!draft||!user) return;
     readForm();
+    if(!trash&&reviewRequired&&!reviewConfirmed) {
+      dialogMessage('저장 전에 날짜와 금액을 원문과 비교한 뒤 확인란에 체크해 주세요.',true);
+      dialog.querySelector('#collabImportConfirmed')?.focus(); return;
+    }
     const invalid=dialog.querySelector(':invalid');
     if(!trash&&invalid) { const pane=invalid.closest('[role="tabpanel"]'); if(pane) switchTab(pane.id.replace('collabPane-','')); invalid.reportValidity(); return; }
     if(draft.deliverables.some(d=>!d.name)){ switchTab('outputs'); dialogMessage('결과물 이름을 입력해 주세요.',true); return; }
@@ -205,11 +243,29 @@ export function createCollaborationManager(client) {
     if(button.dataset.view){view=button.dataset.view;statusFilter='';page=1;render();}
     if(button.dataset.open){const row=rows.find(r=>r.id===button.dataset.open);if(row)void loadEditor(row.id);}
     if(button.dataset.page){page=Number(button.dataset.page);renderResults();}
+    if(button.dataset.month){
+      calendarMonth=moveMonth(calendarMonth,Number(button.dataset.month));
+      calendarDay=calendarMonth===today().slice(0,7)?today():`${calendarMonth}-01`;
+      renderCalendar(`[data-month="${button.dataset.month}"]`);
+    }
+    if(button.hasAttribute('data-calendar-today')){calendarDay=today();calendarMonth=calendarDay.slice(0,7);renderCalendar('[data-calendar-today]');}
+    if(button.dataset.calendarDay){calendarDay=button.dataset.calendarDay;calendarMonth=calendarDay.slice(0,7);renderCalendar(`[data-calendar-day="${calendarDay}"]`);}
+
   });
   root.addEventListener('input',e=>{if(e.target.id==='collabSearch'){query=e.target.value;page=1;renderResults();}});
   root.addEventListener('change',e=>{if(e.target.id==='collabStatusFilter'){statusFilter=e.target.value;page=1;renderResults();}});
   dialog.addEventListener('cancel',e=>{e.preventDefault();closeDialog();});
-  dialog.addEventListener('input',()=>{dirty=true;if(modalMode==='editor'){readForm();updateMoney();}});
+  function resetImportReview() {
+    reviewConfirmed=false;
+    const checkbox=dialog.querySelector('#collabImportConfirmed'); if(checkbox) checkbox.checked=false;
+  }
+  dialog.addEventListener('input',e=>{
+    dirty=true;
+    if(modalMode!=='editor')return;
+    if(e.target.id==='collabImportConfirmed') {reviewConfirmed=e.target.checked;dialogMessage('');}
+    else if(['date','datetime-local','number'].includes(e.target.type)) resetImportReview();
+    readForm();updateMoney();
+  });
   dialog.addEventListener('change',async e=>{
     if(e.target.id!=='collabImportFile'||!e.target.files[0])return;
     const file=e.target.files[0],version=generation;setBusy(true);dialogMessage('파일에서 텍스트를 읽고 있습니다…');
@@ -218,7 +274,7 @@ export function createCollaborationManager(client) {
     finally{if(version===generation)setBusy(false);}
   });
   dialog.addEventListener('submit',e=>{e.preventDefault();void save();});
-  dialog.addEventListener('invalid',e=>{const pane=e.target.closest('[role="tabpanel"]');if(pane)switchTab(pane.id.replace('collabPane-',''));},true);
+  dialog.addEventListener('invalid',e=>{if(e.target.id==='collabImportConfirmed')dialogMessage('저장 전에 날짜와 금액을 원문과 비교한 뒤 확인란에 체크해 주세요.',true);const pane=e.target.closest('[role="tabpanel"]');if(pane)switchTab(pane.id.replace('collabPane-',''));},true);
   dialog.addEventListener('keydown',e=>{const n=e.target.closest('[role="tab"]');if(!n||!['ArrowLeft','ArrowRight','Home','End'].includes(e.key))return;e.preventDefault();const all=[...dialog.querySelectorAll('[role="tab"]')],i=all.indexOf(n),next=e.key==='Home'?0:e.key==='End'?all.length-1:(i+(e.key==='ArrowRight'?1:-1)+all.length)%all.length;switchTab(all[next].dataset.tab);all[next].focus();});
   dialog.addEventListener('click',e=>{
     const b=e.target.closest('button');if(!b||busy)return;
@@ -226,6 +282,7 @@ export function createCollaborationManager(client) {
     if(b.hasAttribute('data-extract')){try{const result=extractCollaboration(dialog.querySelector('#collabImportText').value);result.draft.source_name=importSourceName;void openEditor(null,result);}catch(error){dialogMessage(error.message,true);}return;}
     if(b.dataset.tab){readForm();switchTab(b.dataset.tab);return;}
     if(!draft)return; readForm();
+    if(b.hasAttribute('data-add-output')||b.hasAttribute('data-remove-output')||b.dataset.addLedger||b.dataset.removeLedger)resetImportReview();
     if(b.hasAttribute('data-add-output')){draft.deliverables.push({id:crypto.randomUUID(),kind:'blog',name:'블로그 글',status:'preparing',due_on:draft.publish_due||'',url:''});dirty=true;renderEditor();}
     if(b.hasAttribute('data-remove-output')){draft.deliverables.splice(Number(b.dataset.removeOutput),1);dirty=true;renderEditor();}
     if(b.dataset.addLedger){draft[b.dataset.addLedger].push({id:crypto.randomUUID(),amount:0,date:today(),memo:''});dirty=true;renderEditor();}
@@ -235,7 +292,7 @@ export function createCollaborationManager(client) {
   admin.addEventListener('submit',e=>{e.preventDefault();const f=e.target;void mailAction('save',{sender:f.elements.sender.value.trim(),password:f.elements.password.value.replace(/\s/g,'')});});
   admin.addEventListener('click',e=>{if(e.target.closest('[data-mail-test]'))void mailAction('test');if(e.target.closest('[data-mail-pause]'))void mailAction('pause');});
   return {
-    setUser(next){if(user?.id===next?.id)return;generation++;user=next;loaded=false;loading=false;rows=[];mail=null;busy=false;dirty=false;dialog.close();dialog.replaceChildren();draft=null;modalMode='';view='active';query='';statusFilter='';notice='';admin.replaceChildren();admin.hidden=true;render();if(user)void loadMail();},
+    setUser(next){if(user?.id===next?.id)return;generation++;user=next;loaded=false;loading=false;rows=[];mail=null;busy=false;dirty=false;dialog.close();dialog.replaceChildren();draft=null;modalMode='';reviewRequired=false;reviewConfirmed=false;calendarDay=today();calendarMonth=calendarDay.slice(0,7);view='active';query='';statusFilter='';notice='';admin.replaceChildren();admin.hidden=true;render();if(user)void loadMail();},
     show(pageName){if(pageName==='collaborationView'&&user){if(!loaded&&!loading)void load();else render();}if(pageName==='catalogAdmin'&&user)void loadMail();},
   };
 }

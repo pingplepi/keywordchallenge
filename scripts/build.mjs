@@ -11,7 +11,7 @@ if (supabaseUrl && !/^https:\/\/[a-z0-9-]+\.supabase\.co\/?$/i.test(supabaseUrl)
 }
 
 mkdirSync(output, { recursive: true });
-for (const file of ['collaboration.js', 'collaboration-import.js', 'collaboration.css']) cpSync(resolve(root, file), resolve(output, file));
+for (const file of ['collaboration.js', 'collaboration-import.js', 'collaboration-calendar.js', 'collaboration.css']) cpSync(resolve(root, file), resolve(output, file));
 cpSync(resolve(root, 'vendor/collaboration'), resolve(output, 'vendor/collaboration'), { recursive: true });
 for (const file of ['password-reset.html', 'password-reset.js', 'password-reset.css']) cpSync(resolve(root, file), resolve(output, file));
 for (const file of ['index.html', 'styles.css', 'app.js', 'catalog.js', 'strategy.js', 'keyword-opportunities.js', 'keyword-discovery.js', 'keyword-opportunities.css', 'blogger.js', 'blogger-dashboard.js', 'blogger.css', 'membership.js', 'membership.css', 'blog-analysis.js', 'blog-analysis.css', 'ui-system.css', 'keyon-icon.svg', 'favicon.ico', 'apple-touch-icon.png', 'keyon-share-v1.png']) cpSync(resolve(root, file), resolve(output, file));
