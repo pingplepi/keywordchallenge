@@ -33,6 +33,7 @@
     <link rel="stylesheet" href="/blog-analysis.css" />
     <link rel="stylesheet" href="/ui-system.css" />
     <link rel="stylesheet" href="/keyword-opportunities.css" />
+    <link rel="stylesheet" href="/collaboration.css" />
   </head>
   <body>
     <main class="shell">
@@ -43,13 +44,14 @@
           <button id="signOutButton" class="button button-quiet" type="button">로그아웃</button>
         </div>
       </header>
-      <nav class="section-nav" aria-label="대시보드 메뉴"><a href="#strategyView">대시보드</a><a href="#blogAnalysisView">내 블로그 분석</a><a href="#keywordSearchView">키워드 탐색</a><a href="#savedKeywordsView">보관함</a><a href="#catalogView">전체 키챌 목록</a><a href="#accountView">내 설정</a><a id="memberAdminNav" href="#memberAdmin" hidden>회원 관리</a><a id="adminNav" href="#catalogAdmin" hidden>관리자 설정</a></nav>
+      <nav class="section-nav" aria-label="대시보드 메뉴"><a href="#strategyView">대시보드</a><a href="#blogAnalysisView">내 블로그 분석</a><a href="#keywordSearchView">키워드 탐색</a><a href="#savedKeywordsView">보관함</a><a href="#collaborationView">협업 매니저</a><a href="#catalogView">전체 키챌 목록</a><a href="#accountView">내 설정</a><a id="memberAdminNav" href="#memberAdmin" hidden>회원 관리</a><a id="adminNav" href="#catalogAdmin" hidden>관리자 설정</a></nav>
       <section id="memberAdmin" hidden aria-label="회원 관리"></section>
       <section id="membershipView" hidden aria-label="내 이용 등급"></section>
       <section id="accountView" hidden aria-label="내 작업 공간 설정"></section>
       <section id="bloggerView" hidden aria-label="일반 블로거 대시보드"></section>
       <section id="keywordSearchView" hidden aria-label="키워드 탐색"></section>
       <section id="savedKeywordsView" hidden aria-label="내 키워드 보관함"></section>
+      <section id="collaborationView" hidden aria-label="협업 매니저"></section>
       <section id="blogAnalysisView" hidden aria-label="내 블로그 분석"></section>
       <div id="workspaceToast" class="workspace-toast" role="status" aria-live="polite" hidden></div>
 

@@ -4,6 +4,7 @@ import { createStrategy, connectSearchAd } from './strategy.js';
 import { createBloggerWorkspace } from './blogger.js';
 import { createBlogAnalysis } from './blog-analysis.js';
 import { createMembershipManager } from './membership.js';
+import { createCollaborationManager } from './collaboration.js';
 
 const config = window.APP_CONFIG || {};
 const byId = (id) => document.getElementById(id);
@@ -21,6 +22,7 @@ let searchad;
 let workspace;
 let membership;
 let blogAnalysis;
+let collaboration;
 let member = null;
 let memberReady = false;
 let sessionVersion = 0;
@@ -86,6 +88,7 @@ async function onSessionChanged(nextSession) {
   const version = ++sessionVersion;
   const changedUser = session?.user.id !== nextSession?.user.id;
   session = nextSession;
+  collaboration?.setUser(session?.user || null);
   blogAnalysis?.setUser(session?.user || null);
   searchad?.setUser(session?.user || null);
   void membership?.setUser(session?.user || null);
@@ -468,6 +471,7 @@ async function initialize() {
   strategy = createStrategy(supabase);
   membership = createMembershipManager(supabase);
   blogAnalysis = createBlogAnalysis(supabase);
+  collaboration = createCollaborationManager(supabase);
   workspace = createBloggerWorkspace(supabase, { onMemberChange(next, ready = true) {
     member = next; memberReady = ready; showPage();
   } });
@@ -512,7 +516,7 @@ if (new URLSearchParams(window.location.hash.slice(1)).get('type') === 'recovery
 }
 
 function showPage() {
-  const routes = ['strategyView','catalogView','catalogAdmin','accountView','bloggerView','keywordSearchView','savedKeywordsView','plannerView','blogAnalysisView','memberAdmin','membershipView'];
+  const routes = ['strategyView','catalogView','catalogAdmin','accountView','bloggerView','keywordSearchView','savedKeywordsView','collaborationView','plannerView','blogAnalysisView','memberAdmin','membershipView'];
   const legacyCollectionRoute = location.hash === '#mySpace';
   const hash = legacyCollectionRoute ? 'accountView' : location.hash.slice(1);
   if (legacyCollectionRoute) history.replaceState(history.state, '', '#accountView');
@@ -523,7 +527,7 @@ function showPage() {
   else if (page === 'plannerView') page = 'blogAnalysisView';
   document.body.dataset.page = page;
   byId('appView').hidden = !session || page !== 'accountView' || member?.mode !== 'influencer';
-  for (const id of ['accountView','bloggerView','keywordSearchView','savedKeywordsView','blogAnalysisView','memberAdmin','membershipView']) byId(id).hidden = page !== id;
+  for (const id of ['accountView','bloggerView','keywordSearchView','savedKeywordsView','collaborationView','blogAnalysisView','memberAdmin','membershipView']) byId(id).hidden = page !== id;
   document.querySelectorAll('.section-nav a').forEach(link => {
     const active = link.getAttribute('href') === `#${page === 'bloggerView' ? 'strategyView' : page === 'blogAnalysisView' && hash === 'plannerView' ? 'blogAnalysisView' : page}`;
     link.classList.toggle('active', active);
@@ -533,6 +537,7 @@ function showPage() {
   strategy?.show(page);
   blogAnalysis?.show(page);
   membership?.show(page);
+  collaboration?.show(page);
 }
 window.addEventListener('hashchange', () => { showPage(); window.scrollTo({ top: 0, behavior: 'instant' }); });
 showPage();
