@@ -46,3 +46,5 @@ test('AI unknown fields do not zero amounts or enable mail reminders',()=>{
 });
 
 test('ordinary prose ending in 입니다 is not a sender signature',()=>{const r=extractMail('검토한 원고의 수정 요청입니다.\n제품명은 최신 모델명으로 수정 부탁드립니다.',now);assert.equal(r.draft.company,'');assert.equal(r.draft.contact,'');});
+
+test('a creator signature on outgoing mail does not replace an existing counterparty',()=>{const old={...blankCollaboration(),title:'기존 협업',company:'브랜드',contact:'김담당'};const r=extractMail('제 원고를 전달드립니다.\n여행블로거 홍길동 드림',now);const {proposed}=proposeChanges(old,r);assert.equal(proposed.company,'브랜드');assert.equal(proposed.contact,'김담당');assert.equal(proposed.status,'submitted');});

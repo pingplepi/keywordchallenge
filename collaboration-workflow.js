@@ -66,6 +66,7 @@ export function proposeChanges(current,result){
     let next=result.draft[key];
     if(next===null||next===undefined||next==='')continue;
     if(key==='title'&&current?.title)continue;
+    if(current&&result.method==='local'&&['company','contact'].includes(key)&&base[key])continue;
     if(key==='deliverables')next=mergeOutputs(base.deliverables,next);
     if(current&&['requirements','memo','keywords','required_links'].includes(key))next=append(base[key],next);
     if(JSON.stringify(base[key])===JSON.stringify(next))continue;
