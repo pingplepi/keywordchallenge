@@ -26,3 +26,5 @@
 .collab-log .collab-source{font-weight:400;}.collab-log button{margin:10px 0;}
 .collab-log [id^="collabMessage-"]{background:#faf8fd;padding:16px;border-radius:12px;overflow-wrap:anywhere;}
 @media(max-width:600px){.collab-diff-values{grid-template-columns:1fr;gap:12px;}.collab-diff{padding:14px!important;}.collab-dialog-head .collab-actions{gap:8px;flex-wrap:wrap;}}
+
+.collab-ai-admin label{display:flex;flex-direction:column;gap:8px;font-size:13px;font-weight:700;color:#555263}.collab-ai-admin .collab-ai-paid{flex-direction:row;align-items:flex-start;gap:10px;line-height:1.7;margin:18px 0}.collab-ai-paid input{width:20px!important;height:20px!important;min-height:20px!important;flex-shrink:0;margin-top:2px}.collab-ai-guide{background:#faf8fe;border:1px solid #e7def5;border-radius:12px;padding:16px 18px;margin:16px 0;font-size:14px;line-height:1.8}.collab-ai-guide summary{cursor:pointer;color:#6e51bb;font-weight:700}.collab-ai-guide ol{padding-left:22px}.collab-ai-guide li+li{margin-top:10px}.collab-ai-guide a{overflow-wrap:anywhere}
