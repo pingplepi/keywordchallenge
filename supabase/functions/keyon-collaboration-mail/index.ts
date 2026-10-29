@@ -13,6 +13,19 @@ function transport(credentials:{user:string,password:string}) {
 function message(title:string, body:string) {
   return `<!doctype html><html lang="ko"><body style="margin:0;background:#f7f5fb;padding:32px 16px;font-family:Arial,sans-serif;color:#302b3b"><div style="max-width:560px;margin:auto;background:white;border-radius:18px;padding:32px"><div style="font-size:30px;font-weight:800">key<span style="color:#7654dc">:on</span></div><h1 style="font-size:22px;margin-top:28px">${escapeHtml(title)}</h1>${body}<p style="margin-top:28px"><a style="display:inline-block;padding:14px 22px;background:#7654dc;color:white;border-radius:10px;text-decoration:none;font-weight:bold" href="https://keyon.vercel.app/#collaborationView">협업 매니저 열기</a></p><p style="font-size:12px;color:#92889f;line-height:1.8;margin-top:32px">키온에서 직접 설정한 협업 알림입니다.<br>협업 매니저 → 해당 협업 → 일정·알림에서 수신을 해제할 수 있습니다.<br>© 2026 뷰티지니 그리고 핑플피. All rights reserved.</p></div></body></html>`;
 }
+
+function reminderContent(job:any) {
+  const date=new Date(job.target_at).toLocaleDateString('ko-KR',{timeZone:'Asia/Seoul',dateStyle:'long'});
+  const items=Array.isArray(job.event_items)&&job.event_items.length
+    ? job.event_items.map((item:any)=>String(item.label)) : [String(job.event)];
+  const title=String(job.title).replace(/[\r\n]/g,' ').slice(0,100);
+  return {
+    subject:`[키온] ${job.event} 일정 알림 · ${title}`,
+    text:[job.company||'',job.title,`${job.event}: ${date}`,...items.map((label:string)=>`• ${label}`),'','협업 매니저에서 일정과 진행 상황을 확인해 주세요.','https://keyon.vercel.app/#collaborationView','','협업의 일정·알림에서 수신을 해제할 수 있습니다.'].join('\n'),
+    html:message(`${job.event} 일정을 확인해 주세요`,`<p style="color:#81758e">${escapeHtml(job.company)}</p><p style="font-size:18px;font-weight:bold">${escapeHtml(job.title)}</p><div style="padding:18px;background:#f3eefc;border-radius:10px;line-height:1.8"><strong>${escapeHtml(date)}</strong><ul style="margin:8px 0 0;padding-left:20px">${items.map((label:string)=>`<li>${escapeHtml(label)}</li>`).join('')}</ul></div>`)
+  };
+}
+
 Deno.serve(async req => {
   if(req.method==='OPTIONS')return new Response(null,{status:204,headers});
   if(req.method!=='POST')return reply(405,{ok:false,message:'POST 요청이 필요합니다.'});
@@ -31,11 +44,11 @@ Deno.serve(async req => {
       try {
         while(processed<5&&Date.now()-started<35000) {
           const job=await rpc('keyon_collaboration_claim_mail');if(!job)break;
-          const fresh=await db.from('keyon_collaboration_reminders').select('state').eq('id',job.id).eq('lease',job.lease).maybeSingle();
+          const fresh=await db.from('keyon_collaboration_reminders').select('state,event_label,event_items,target_at').eq('id',job.id).eq('lease',job.lease).maybeSingle();
           if(fresh.error||fresh.data?.state!=='sending')continue;
-          const date=new Date(job.target_at).toLocaleDateString('ko-KR',{timeZone:'Asia/Seoul',dateStyle:'long'});
+          const content=reminderContent({...job,event:fresh.data.event_label||job.event,event_items:fresh.data.event_items,target_at:fresh.data.target_at||job.target_at});
           try {
-            await smtp.sendMail({from:{name:'키온',address:credentials.user},to:job.email,messageId:`<collab-${job.id}@keyon.vercel.app>`,subject:`[키온] ${job.event} 일정 알림 · ${String(job.title).replace(/[\r\n]/g,' ').slice(0,100)}`,text:`${job.company || ''}\n${job.title}\n${job.event}: ${date}\n\n협업 매니저에서 일정과 진행 상황을 확인해 주세요.\nhttps://keyon.vercel.app/#collaborationView\n\n협업의 일정·알림에서 수신을 해제할 수 있습니다.`,html:message(`${job.event} 일정을 확인해 주세요`,`<p style="color:#81758e">${escapeHtml(job.company)}</p><p style="font-size:18px;font-weight:bold">${escapeHtml(job.title)}</p><p style="padding:18px;background:#f3eefc;border-radius:10px;line-height:1.8">${escapeHtml(job.event)}<br><strong>${escapeHtml(date)}</strong></p>`)});
+            await smtp.sendMail({from:{name:'키온',address:credentials.user},to:job.email,messageId:`<collab-${job.id}@keyon.vercel.app>`,...content});
             const done=await db.from('keyon_collaboration_reminders').update({state:'sent',sent_at:new Date().toISOString(),error:null}).eq('id',job.id).eq('lease',job.lease);
             if(done.error) return reply(500,{ok:false,message:'발송 결과 기록을 확인해야 합니다.'});
             processed++;
