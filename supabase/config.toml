@@ -24,3 +24,6 @@ verify_jwt = true
 # Validates member JWTs or the existing private scheduler token internally.
 [functions.keyon-collaboration-mail]
 verify_jwt = false
+
+[functions.keyon-collaboration-ai]
+verify_jwt = false

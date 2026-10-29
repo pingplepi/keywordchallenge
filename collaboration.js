@@ -1,4 +1,6 @@
 import { blankCollaboration, extractCollaboration, readGuideFile, sumMoney, outstanding, STATUS, KINDS } from './collaboration-import.js';
+import { extractMail, proposeChanges, displayValue, FIELD_LABELS, STAGES } from './collaboration-workflow.js';
+import { createCollaborationAI } from './collaboration-ai.js';
 import { EVENT_TYPES, monthDays, moveMonth, calendarEvents } from './collaboration-calendar.js';
 
 const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -24,6 +26,8 @@ function eventsFor(row) {
 
 export function createCollaborationManager(client) {
   const root = document.getElementById('collaborationView');
+  const ai = createCollaborationAI(client);
+  let importBase=null, pendingMessage=null, proposal=null, messages=[], messagesError='', messagesHasMore=false;
   const admin = document.createElement('section'); admin.className = 'panel admin-panel collab-mail-admin'; admin.hidden = true;
   document.getElementById('catalogAdmin').append(admin);
   const dialog = document.createElement('dialog'); dialog.className = 'collab-dialog'; dialog.setAttribute('aria-labelledby', 'collabDialogTitle'); document.body.append(dialog);
@@ -127,23 +131,76 @@ export function createCollaborationManager(client) {
     await openEditor(data);
   }
   function closeDialog(force = false) { if (busy) return; if (!force && dirty && !window.confirm('저장하지 않은 내용이 있습니다. 닫으시겠어요?')) return; dialog.close(); draft=null; modalMode=''; dirty=false; }
-  function openImport() {
+  function openImport(existing=null) {
+    importBase=existing?structuredClone(existing):null; pendingMessage=null;proposal=null;
     modalMode='import'; draft=null; importSourceName=''; dirty=false; busy=false;
-    dialog.innerHTML = `<div class="collab-dialog-head"><div><p class="eyebrow">START FROM YOUR BRIEF</p><h2 id="collabDialogTitle">메일·가이드 가져오기</h2></div><button class="button button-quiet" data-close aria-label="가져오기 닫기">닫기</button></div><div class="collab-dialog-body"><p class="muted">원문에서 항목을 찾아 초안을 채웁니다. 내용은 이 브라우저에서 분석하며, 저장하기 전에는 서버에 보내지 않습니다.</p><label class="collab-upload">가이드 파일<input id="collabImportFile" type="file" accept=".pdf,.docx,.txt,.md,.html,.htm,.eml" /><span>PDF·Word·텍스트·HTML · 최대 5MB, PDF 40페이지 · 스캔 이미지는 텍스트 필요</span></label><label>협업 메일 또는 가이드 내용<textarea id="collabImportText" rows="14" maxlength="50000" placeholder="예시&#10;업체명: 키온 여행&#10;협업명: 제주 숙박 체험&#10;제공 제품: 2박 숙박권&#10;원고료: 20만원&#10;발행 마감: 2026/11/15&#10;필수 키워드: 제주 숙소, 가족 여행&#10;결과물: 블로그 1건, 릴스 1건"></textarea></label><p class="muted small">연도 없는 날짜나 협의 중인 금액은 확인 표시가 나옵니다. 원본 파일 대신 추출한 텍스트를 협업 기록에 저장합니다.</p><p id="collabDialogMessage" role="status"></p></div><div class="collab-dialog-footer"><button class="button button-quiet" data-close>취소</button><button class="button" data-extract>자동 분류 · 초안 확인</button></div>`;
+    const available=ai.status?.enabled;
+    dialog.innerHTML = `<div class="collab-dialog-head"><div><p class="eyebrow">MAIL TO COLLABORATION</p><h2 id="collabDialogTitle">${existing?'메일·가이드 추가':'메일·가이드 가져오기'}</h2></div><button class="button button-quiet" data-close>닫기</button></div><div class="collab-dialog-body">${existing?`<p class="collab-import-target">추가할 협업: <strong>${esc(existing.title)}</strong></p>`:''}<p class="muted">받거나 보낸 메일을 그대로 붙여넣어 주세요. 필요한 내용과 기존 조건의 변경 사항을 추려서 보여드립니다.</p><label class="collab-upload">가이드 파일<input id="collabImportFile" type="file" accept=".pdf,.docx,.txt,.md,.html,.htm,.eml" /><span>PDF·Word·텍스트·HTML · 최대 5MB, PDF 40페이지 · 스캔 이미지는 텍스트 필요</span></label><label>메일 또는 가이드 내용<textarea id="collabImportText" rows="12" maxlength="50000" placeholder="안녕하세요. 이번 협업은 제품 제공과 원고료 10만 원으로 진행하고 싶습니다…"></textarea></label><label>분석 방식<select id="collabAnalysisMode"><option value="ai" ${available?'selected':'disabled'}>AI 문맥 분석${available?'':' · 운영자 연결 필요'}</option><option value="local" ${available?'':'selected'}>기본 자동 분류 · 외부 전송 없음</option></select></label><p class="muted small">기본 분류는 이 브라우저에서 처리합니다. AI는 문맥을 해석하며 1회 최대 24,000자, 회원당 하루 10회입니다. 원본 파일 대신 추출한 텍스트를 사용합니다.</p><label class="collab-checkbox" id="collabAIConsentLabel" ${available?'':'hidden'}><input id="collabAIConsent" type="checkbox" />이 본문과 현재 협업 조건을 OpenAI로 보내 분석하는 데 동의합니다. 불필요한 개인정보는 지워 주세요.</label><p id="collabDialogMessage" role="status"></p></div><div class="collab-dialog-footer"><button class="button button-quiet" ${existing?'data-import-back':'data-close'}>취소</button><button class="button" data-extract>${available?'AI로 분석 · 변경 확인':'자동 분류 · 변경 확인'}</button></div>`;
     showDialog();
+  }
+  async function analyzeImport(){
+    const source=dialog.querySelector('#collabImportText').value.trim(),useAI=dialog.querySelector('#collabAnalysisMode').value==='ai';
+    if(!source){dialogMessage('메일이나 가이드 내용을 넣어 주세요.',true);return;}
+    if(useAI&&!dialog.querySelector('#collabAIConsent').checked){dialogMessage('AI 전송 안내를 확인하고 동의란에 체크해 주세요.',true);return;}
+    const version=generation;setBusy(true);dialogMessage(useAI?'메일의 문맥과 변경 사항을 분석하고 있습니다…':'메일에서 필요한 정보를 찾고 있습니다…');
+    try{
+      if(importBase?.id){const existing=await client.rpc('keyon_collaboration_message_exists',{p_id:importBase.id,p_source:source});if(existing.error)throw existing.error;if(existing.data)throw new Error('이 협업에 이미 추가한 원문입니다. 메모·메일 이력에서 확인해 주세요.');}
+      const result=useAI?await ai.analyze(source,importBase?.id||null):extractMail(source);
+      if(importBase){result.warnings=result.warnings.filter(s=>!s.includes('협업명을 입력')&&!s.includes('현금 원고료를 찾지 못'));result.summary=result.summary.replace('업체 확인 필요',importBase.company||'기존 협업');}
+      if(version!==generation||modalMode!=='import')return;
+      proposal={...proposeChanges(importBase,result),result,source,source_name:importSourceName};
+      busy=false;renderImportReview();
+    }catch(error){if(version===generation)dialogMessage(error.message||'분석하지 못했습니다. 다시 시도해 주세요.',true);}
+    finally{if(version===generation)setBusy(false);}
+  }
+  function renderImportReview(){
+    modalMode='review';dirty=true;
+    dialog.innerHTML=`<div class="collab-dialog-head"><div><p class="eyebrow">REVIEW CHANGES</p><h2 id="collabDialogTitle">${importBase?'협업에 반영할 내용':'새 협업으로 정리한 내용'}</h2></div><button class="button button-quiet" data-close>닫기</button></div><div class="collab-dialog-body"><span class="status-pill">${proposal.result.method==='ai'?'AI 문맥 분석':'기본 자동 분류'} · ${esc(STAGES[proposal.result.stage]||'협업 메일')}</span><p>${esc(proposal.result.summary)}</p><p class="muted">반영할 항목을 선택해 주세요. 언급되지 않은 기존 정보는 유지하고, 원문은 메일 이력에 남깁니다.</p>${proposal.result.warnings.length?`<ul class="collab-import-warnings">${proposal.result.warnings.map(s=>`<li>${esc(s)}</li>`).join('')}</ul>`:''}<div class="collab-diff-list">${proposal.changes.map((c,i)=>`<label class="collab-diff"><span class="collab-diff-heading"><input type="checkbox" data-change="${i}" checked /><strong>${esc(c.label)}</strong></span><span class="collab-diff-values"><span><small>기존</small><span>${esc(displayValue(c.key,c.before))}</span></span><span><small>반영할 내용</small><span>${esc(displayValue(c.key,c.after))}</span></span></span></label>`).join('')||'<p>변경할 항목이 없습니다. 원문만 이력에 추가할 수 있습니다.</p>'}</div><details><summary>이번 메일·가이드 원문</summary><pre class="collab-source">${esc(proposal.source)}</pre></details></div><div class="collab-dialog-footer"><button class="button button-quiet" data-review-back>원문으로 돌아가기</button><button class="button" data-apply-import>선택한 내용 반영 · 저장 전 확인</button></div>`;
+  }
+  async function applyImport(){
+    const merged=structuredClone(proposal.base);
+    dialog.querySelectorAll('[data-change]:checked').forEach(n=>{const c=proposal.changes[Number(n.dataset.change)];merged[c.key]=structuredClone(c.after);});
+    if(!importBase){merged.source_text=proposal.source;merged.source_name=proposal.source_name;}
+    const incoming={id:crypto.randomUUID(),source_text:proposal.source,source_name:proposal.source_name,summary:proposal.result.summary,stage:proposal.result.stage,method:proposal.result.method};
+    const result=proposal.result;
+    await openEditor(importBase?merged:null,{...result,draft:merged,message:incoming});
+  }
+  function messagesHtml(){
+    return `<h3>메일·가이드 이력</h3><p class="muted small">추가한 시각순으로 표시합니다. 각 메일의 원문과 실제 저장한 변경 내용을 확인할 수 있습니다.</p>${pendingMessage?'<p class="collab-import-target">이번 메일은 협업 저장 시 이력에 함께 추가됩니다.</p>':''}${messagesError?`<p class="error">${esc(messagesError)}</p>`:''}<ul class="collab-log">${messages.map(m=>`<li><strong>${esc(STAGES[m.stage]||'협업 메일')}</strong> · ${dateTime(m.created_at)}<span>${esc(m.summary)}</span><button type="button" class="button button-light" data-message="${m.id}">원문·반영 내용 보기</button><div id="collabMessage-${m.id}" hidden></div></li>`).join('')||'<li>저장된 메일 이력이 없습니다.</li>'}</ul>${messagesHasMore?'<button type="button" class="button button-light" data-more-messages>이전 메일 더 보기</button>':''}`;
+  }
+  async function moreMessages(){
+    const id=draft?.id,version=generation;if(!id)return;
+    const b=dialog.querySelector('[data-more-messages]');if(b)b.disabled=true;
+    const r=await client.from('keyon_collaboration_messages').select('id,created_at,summary,stage,method').eq('collaboration_id',id).order('created_at',{ascending:false}).range(messages.length,messages.length+99);
+    if(version!==generation||draft?.id!==id)return;
+    if(r.error){dialogMessage('이전 메일을 불러오지 못했습니다.',true);if(b)b.disabled=false;return;}
+    readForm();messages.push(...r.data);messagesHasMore=r.data.length===100;renderEditor();
+  }
+  async function showMessage(id){
+    const node=dialog.querySelector(`#collabMessage-${id}`);if(!node)return;
+    if(node.textContent){node.hidden=!node.hidden;return;}
+    node.hidden=false;node.textContent='원문을 불러오고 있습니다…';const version=generation;
+    const r=await client.from('keyon_collaboration_messages').select('source_text,source_name,applied_changes').eq('id',id).eq('collaboration_id',draft.id).single();
+    if(version!==generation||!node.isConnected)return;
+    if(r.error){node.textContent='원문을 불러오지 못했습니다. 창을 다시 열어 주세요.';return;}
+    node.innerHTML=`<p>${esc(r.data.source_name||'붙여넣은 메일')}</p><pre class="collab-source">${esc(r.data.source_text)}</pre><h4>저장한 변경 내용</h4>${Object.entries(r.data.applied_changes).filter(([key])=>FIELD_LABELS[key]).map(([key,c])=>`<p><strong>${esc(FIELD_LABELS[key])}</strong><br>${esc(displayValue(key,c.before))} → ${esc(displayValue(key,c.after))}</p>`).join('')||'<p>원문만 이력에 추가했습니다.</p>'}`;
   }
   async function openEditor(row = null, imported = null) {
     modalMode='editor'; draft=structuredClone(row || imported?.draft || blankCollaboration()); evidence=imported?.evidence || []; warnings=imported?.warnings || []; tab='basic'; history=[]; reminders=[]; dirty=!!imported; busy=false;
-    reviewRequired=Boolean(imported); reviewConfirmed=false;
-    if (!row && !draft.deliverables.length) draft.deliverables.push({id:crypto.randomUUID(),kind:'blog',name:'블로그 글',status:'preparing',due_on:'',url:''});
+    reviewRequired=Boolean(imported); reviewConfirmed=false; pendingMessage=imported?.message||null; messages=[];messagesError='';messagesHasMore=false;
+    if (!row && !imported && !draft.deliverables.length) draft.deliverables.push({id:crypto.randomUUID(),kind:'blog',name:'블로그 글',status:'preparing',due_on:'',url:''});
     renderEditor(); showDialog();
     if (row) {
       const version=generation, id=row.id;
       const results=await Promise.allSettled([
         client.from('keyon_collaboration_history').select('happened_at,action,changes').eq('collaboration_id',id).order('happened_at',{ascending:false}).limit(50),
         client.from('keyon_collaboration_reminders').select('event_label,due_at,state,sent_at,error').eq('collaboration_id',id).neq('state','cancelled').order('due_at',{ascending:false}).limit(50),
+        client.from('keyon_collaboration_messages').select('id,created_at,summary,stage,method').eq('collaboration_id',id).order('created_at',{ascending:false}).limit(100),
       ]);
       if(version!==generation || draft?.id!==id || modalMode!=='editor') return;
+      messages=results[2].status==='fulfilled'&&!results[2].value.error?results[2].value.data:[];
+      messagesHasMore=messages.length===100;
+      if(results[2].status==='rejected'||results[2].value.error)messagesError='메일 이력을 불러오지 못했습니다. 창을 다시 열어 주세요.';
       history=results[0].status==='fulfilled'&&!results[0].value.error?results[0].value.data:[];
       reminders=results[1].status==='fulfilled'&&!results[1].value.error?results[1].value.data:[];
       if(tab==='notes'||tab==='schedule') { readForm(); renderEditor(); }
@@ -152,15 +209,15 @@ export function createCollaborationManager(client) {
   const field = (name,label,type='text',max=160) => `<label>${label}<input name="${name}" type="${type}" value="${esc(draft[name] || '')}" maxlength="${max}" ${name==='title'?'required':''} /></label>`;
   const area = (name,label,rows=3,max=10000) => `<label>${label}<textarea name="${name}" rows="${rows}" maxlength="${max}">${esc(draft[name])}</textarea></label>`;
   function renderEditor() {
-    const tabs=[['basic','기본 정보'],['terms','협업 조건'],['schedule','일정·알림'],['outputs','결과물'],['money','금액·정산'],['notes','메모·이력']];
-    dialog.innerHTML=`<form id="collabForm"><div class="collab-dialog-head"><div><p class="eyebrow">${draft.id?'COLLABORATION DETAILS':'NEW COLLABORATION'}</p><h2 id="collabDialogTitle">${draft.id?esc(draft.title):'새 협업 등록'}</h2></div><button type="button" class="button button-quiet" data-close>닫기</button></div><div class="collab-editor-tabs" role="tablist" aria-label="협업 항목">${tabs.map(([key,label])=>`<button type="button" role="tab" id="collabTab-${key}" aria-controls="collabPane-${key}" aria-selected="${tab===key}" tabindex="${tab===key?'0':'-1'}" data-tab="${key}">${label}</button>`).join('')}</div><div class="collab-dialog-body">
+    const tabs=[['basic','기본 정보'],['terms','협업 조건'],['schedule','일정·알림'],['outputs','결과물'],['money','금액·정산'],['notes','메모·메일 이력']];
+    dialog.innerHTML=`<form id="collabForm"><div class="collab-dialog-head"><div><p class="eyebrow">${draft.id?'COLLABORATION DETAILS':'NEW COLLABORATION'}</p><h2 id="collabDialogTitle">${draft.id?esc(draft.title):'새 협업 등록'}</h2></div><div class="collab-actions">${draft.id&&!pendingMessage&&!draft.deleted_at?'<button type="button" class="button button-light" data-add-mail>메일·가이드 추가</button>':''}<button type="button" class="button button-quiet" data-close>닫기</button></div></div><div class="collab-editor-tabs" role="tablist" aria-label="협업 항목">${tabs.map(([key,label])=>`<button type="button" role="tab" id="collabTab-${key}" aria-controls="collabPane-${key}" aria-selected="${tab===key}" tabindex="${tab===key?'0':'-1'}" data-tab="${key}">${label}</button>`).join('')}</div><div class="collab-dialog-body">
       ${warnings.length?`<div class="collab-import-review"><strong>원문과 비교해 확인해 주세요</strong><ul>${warnings.map(w=>`<li>${esc(w)}</li>`).join('')}</ul>${evidence.length?`<details><summary>자동 분류에 참고한 문구 ${evidence.length}개</summary>${evidence.map(e=>`<p><strong>${esc(e.field)}</strong> · ${esc(e.line)}</p>`).join('')}</details>`:''}</div>`:''}
       <section id="collabPane-basic" role="tabpanel" aria-labelledby="collabTab-basic" ${tab==='basic'?'':'hidden'}><div class="collab-form-grid">${field('title','협업명 *')}${field('company','업체명')}${field('channel','협업 경로 · 플랫폼 · 대행사')}${field('contact','담당자 · 연락처','text',300)}<label>전체 진행 상태<select name="status">${Object.entries(STATUS).map(([k,v])=>`<option value="${k}" ${draft.status===k?'selected':''}>${v}</option>`).join('')}</select></label></div><p class="muted small">완료·취소한 협업은 이력에 남습니다. 결과물별 진행 상황은 ‘결과물’에서 각각 변경할 수 있습니다.</p></section>
       <section id="collabPane-terms" role="tabpanel" aria-labelledby="collabTab-terms" ${tab==='terms'?'':'hidden'}>${area('products','제공받는 제품·서비스',3,3000)}${area('requirements','요청사항 · 가이드',5)}${area('keywords','필수 키워드 · 해시태그',2,2000)}${area('required_links','필수 삽입 링크',2,4000)}</section>
       <section id="collabPane-schedule" role="tabpanel" aria-labelledby="collabTab-schedule" ${tab==='schedule'?'':'hidden'}><div class="collab-form-grid"><label>방문·예약 일시<input type="datetime-local" name="visit_at" value="${esc(kstDateTime(draft.visit_at))}" /></label>${field('draft_due','원고 제출일','date')}${field('publish_due','발행 마감일','date')}${field('payment_due','정산 예정일','date')}</div><div class="collab-reminder-box"><label class="collab-checkbox"><input type="checkbox" name="reminder_enabled" ${draft.reminder_enabled?'checked':''} />내 이메일로 일정 리마인드 받기</label><p>받는 주소: <strong>${esc(user?.email)}</strong></p><div class="collab-form-grid"><label>알림 시점<select name="reminder_days">${[0,1,3,7].map(n=>`<option value="${n}" ${draft.reminder_days===n?'selected':''}>${n===0?'당일':`${n}일 전`}</option>`).join('')}</select></label><label>알림 시간 · 한국시간<select name="reminder_hour">${Array.from({length:24},(_,n)=>`<option value="${n}" ${draft.reminder_hour===n?'selected':''}>${String(n).padStart(2,'0')}:00</option>`).join('')}</select></label></div><p class="muted small">등록한 일정과 결과물 마감일에 한 번씩 안내합니다. 이미 지난 알림 시각은 소급 발송하지 않습니다. 발송은 설정한 시각부터 약 5분 간격으로 처리하며, 계정당 하루 10건까지입니다.</p><p class="${mail?.enabled?'collab-success':'collab-overdue'}">${mail?.enabled?'알림 메일 연결됨':mail===null?'알림 메일 연결 상태를 확인하지 못했습니다.': '운영자의 알림 메일 연결이 필요합니다. 연결 전에는 메일이 발송되지 않습니다.'}</p></div>${reminders.length?`<details><summary>알림 예약·발송 내역</summary><ul class="collab-log">${reminders.map(r=>`<li>${esc(r.event_label)} · ${dateTime(r.due_at)}<span>${({pending:'예약됨',sending:'발송 중',sent:'발송 완료',failed:'발송 실패'})[r.state]}${r.error?` · ${esc(r.error)}`:''}</span></li>`).join('')}</ul></details>`:''}</section>
       <section id="collabPane-outputs" role="tabpanel" aria-labelledby="collabTab-outputs" ${tab==='outputs'?'':'hidden'}><div class="collab-section-heading"><div><h3>결과물별 진행 상황</h3><p class="muted">블로그 글과 릴스를 각각 등록하고 게시 링크를 남겨 주세요.</p></div><button type="button" class="button button-light" data-add-output ${draft.deliverables.length>=20?'disabled':''}>＋ 결과물</button></div><div class="collab-output-list">${draft.deliverables.map((d,i)=>`<div class="collab-output-card" data-output="${i}"><div class="collab-section-heading"><strong>결과물 ${i+1}</strong><button type="button" class="button button-quiet" data-remove-output="${i}">삭제</button></div><div class="collab-form-grid"><label>종류<select data-key="kind">${Object.entries(KINDS).map(([k,v])=>`<option value="${k}" ${d.kind===k?'selected':''}>${v}</option>`).join('')}</select></label><label>결과물 이름<input data-key="name" value="${esc(d.name)}" maxlength="160" /></label><label>진행 상태<select data-key="status">${Object.entries(STATUS).filter(([k])=>!['completed','cancelled'].includes(k)).map(([k,v])=>`<option value="${k}" ${d.status===k?'selected':''}>${v}</option>`).join('')}</select></label><label>발행 마감일<input type="date" data-key="due_on" value="${esc(d.due_on)}" /></label><label class="collab-span">게시 링크<input type="url" data-key="url" value="${esc(d.url)}" maxlength="2000" placeholder="https://" /></label></div>${safeUrl(d.url)?`<a href="${esc(safeUrl(d.url))}" target="_blank" rel="noopener noreferrer">게시물 보기 ↗</a>`:''}</div>`).join('') || '<p class="muted">등록된 결과물이 없습니다. 위 버튼으로 추가해 주세요.</p>'}</div></section>
       <section id="collabPane-money" role="tabpanel" aria-labelledby="collabTab-money" ${tab==='money'?'':'hidden'}><div class="collab-form-grid"><label>약정 현금 원고료 · 원<input name="cash_fee" type="number" min="0" max="99999999999" step="1" value="${draft.cash_fee}" /></label><label>제품·서비스 제공가 · 원<input name="provided_value" type="number" min="0" max="99999999999" step="1" value="${draft.provided_value}" /></label></div><label class="collab-deduction">공제액 · 원천징수 등 · 원<input name="deductions" type="number" min="0" max="99999999999" step="1" value="${draft.deductions || 0}" /></label><p class="muted small">약정 원고료는 합의한 금액, 입금 내역은 실제 받은 금액을 적어 주세요. 원천징수 등 실제 공제된 금액은 공제액에 입력해 주세요. 세액은 자동 계산하지 않습니다.</p><div class="collab-money-summary" id="collabMoneySummary"></div>${ledgerHtml('payments','입금 내역')}${ledgerHtml('expenses','지출 내역')}<p class="muted small">제품·서비스 제공가는 현금 입금·미입금·현금 잔액 계산에 포함되지 않습니다.</p></section>
-      <section id="collabPane-notes" role="tabpanel" aria-labelledby="collabTab-notes" ${tab==='notes'?'':'hidden'}>${area('memo','메모',5)}${draft.source_text?`<details><summary>가져온 원문${draft.source_name?` · ${esc(draft.source_name)}`:''}</summary><pre class="collab-source">${esc(draft.source_text)}</pre></details>`:''}<h3>변경 이력</h3><ul class="collab-log">${history.map(h=>`<li>${dateTime(h.happened_at)}<span>${historyLabel(h)}</span></li>`).join('') || '<li>저장 후 변경 이력이 기록됩니다.</li>'}</ul></section>
+      <section id="collabPane-notes" role="tabpanel" aria-labelledby="collabTab-notes" ${tab==='notes'?'':'hidden'}>${area('memo','메모',5)}${messagesHtml()}${draft.source_text?`<details><summary>가져온 원문${draft.source_name?` · ${esc(draft.source_name)}`:''}</summary><pre class="collab-source">${esc(draft.source_text)}</pre></details>`:''}<h3>변경 이력</h3><ul class="collab-log">${history.map(h=>`<li>${dateTime(h.happened_at)}<span>${historyLabel(h)}</span></li>`).join('') || '<li>저장 후 변경 이력이 기록됩니다.</li>'}</ul></section>
       <p id="collabDialogMessage" class="collab-dialog-message" role="status"></p></div>${reviewRequired?`<div class="collab-save-review"><strong>날짜와 금액은 저장 전에 꼭 확인해 주세요.</strong><p>자동 분류된 내용이 원문과 다를 수 있습니다.</p><div class="collab-review-actions"><button type="button" data-tab="schedule">일정 확인 ↗</button><button type="button" data-tab="money">금액 확인 ↗</button></div><label class="collab-checkbox"><input id="collabImportConfirmed" type="checkbox" required ${reviewConfirmed?'checked':''} />날짜와 금액을 원문과 비교해 확인했습니다.</label></div>`:''}<div class="collab-dialog-footer">${draft.id?`<button type="button" class="button button-quiet" data-trash>${draft.deleted_at?'휴지통에서 복원':'휴지통으로 이동'}</button>`:'<span></span>'}<div class="collab-actions"><button type="button" class="button button-quiet" data-close>취소</button><button type="submit" class="button">${draft.id?'변경 저장':'협업 저장'}</button></div></div></form>`;
     updateMoney();
   }
@@ -204,16 +261,18 @@ export function createCollaborationManager(client) {
     if(trash) payload.deleted_at=draft.deleted_at?null:new Date().toISOString();
     setBusy(true); dialogMessage('저장하고 있습니다…');
     try {
-      const result=id?await client.from('keyon_collaborations').update(payload).eq('id',id).eq('revision',revision).select().maybeSingle():await client.from('keyon_collaborations').insert({...payload,user_id:user.id}).select().single();
+      let result;
+      if(pendingMessage&&!trash){const saved=await client.rpc('keyon_save_collaboration_message',{p_id:id||null,p_revision:revision||null,p_payload:payload,p_message:pendingMessage});result={error:saved.error,data:saved.data?.row,duplicate:saved.data?.duplicate};}
+      else result=id?await client.from('keyon_collaborations').update(payload).eq('id',id).eq('revision',revision).select().maybeSingle():await client.from('keyon_collaborations').insert({...payload,user_id:user.id}).select().single();
       if(version!==generation) return;
       if(result.error) throw result.error;
       if(!result.data) throw new Error('다른 화면에서 이 기록이 변경되었습니다. 작성 내용을 복사해 둔 뒤 목록을 새로고침해 주세요.');
-      rows=[result.data,...rows.filter(r=>r.id!==result.data.id)]; busy=false;dirty=false;closeDialog(true); report(trash?'협업 기록을 이동했습니다.':'협업을 저장했습니다.');
+      rows=[result.data,...rows.filter(r=>r.id!==result.data.id)]; busy=false;dirty=false;closeDialog(true); report(result.duplicate?'이미 추가한 메일입니다. 저장된 협업을 표시했습니다.':trash?'협업 기록을 이동했습니다.':pendingMessage?'메일 이력과 협업 정보를 함께 저장했습니다.':'협업을 저장했습니다.');pendingMessage=null;
     } catch(error) { if(version===generation) dialogMessage(error.message||'저장하지 못했습니다. 다시 시도해 주세요.',true); }
     finally { if(version===generation) setBusy(false); }
   }
   function switchTab(key) {
-    tab=key; dialog.querySelectorAll('[role="tabpanel"]').forEach(n=>n.hidden=n.id!==`collabPane-${key}`);
+    tab=key; if(key==='notes'||key==='schedule')renderEditor(); dialog.querySelectorAll('[role="tabpanel"]').forEach(n=>n.hidden=n.id!==`collabPane-${key}`);
     dialog.querySelectorAll('[role="tab"]').forEach(n=>{n.setAttribute('aria-selected',String(n.dataset.tab===key));n.tabIndex=n.dataset.tab===key?0:-1;});
     dialog.querySelector('.collab-dialog-body')?.scrollTo({top:0});
   }
@@ -267,19 +326,26 @@ export function createCollaborationManager(client) {
     readForm();updateMoney();
   });
   dialog.addEventListener('change',async e=>{
+    if(e.target.id==='collabAnalysisMode'){const useAI=e.target.value==='ai';dialog.querySelector('#collabAIConsentLabel').hidden=!useAI;dialog.querySelector('[data-extract]').textContent=useAI?'AI로 분석 · 변경 확인':'자동 분류 · 변경 확인';return;}
     if(e.target.id!=='collabImportFile'||!e.target.files[0])return;
     const file=e.target.files[0],version=generation;setBusy(true);dialogMessage('파일에서 텍스트를 읽고 있습니다…');
-    try{const text=await readGuideFile(file);if(version!==generation||modalMode!=='import')return;dialog.querySelector('#collabImportText').value=text;importSourceName=file.name;dirty=true;dialogMessage(`${file.name} · 내용을 읽었습니다. 아래에서 자동 분류를 눌러 주세요.`);}
+    try{const text=await readGuideFile(file);if(version!==generation||modalMode!=='import')return;const input=dialog.querySelector('#collabImportText'),combined=input.value.trim()?`${input.value.trim()}\n\n[가이드 파일: ${file.name}]\n${text}`:text;if(combined.length>50000)throw new Error('메일과 가이드의 합계가 50,000자를 넘습니다. 필요한 부분만 나누어 추가해 주세요.');input.value=combined;importSourceName=[importSourceName,file.name].filter(Boolean).join(', ').slice(0,300);dirty=true;dialogMessage(`${file.name} · 내용을 읽었습니다. 아래에서 자동 분류를 눌러 주세요.`);}
     catch(error){if(version===generation)dialogMessage(error.message,true);}
     finally{if(version===generation)setBusy(false);}
   });
   dialog.addEventListener('submit',e=>{e.preventDefault();void save();});
   dialog.addEventListener('invalid',e=>{if(e.target.id==='collabImportConfirmed')dialogMessage('저장 전에 날짜와 금액을 원문과 비교한 뒤 확인란에 체크해 주세요.',true);const pane=e.target.closest('[role="tabpanel"]');if(pane)switchTab(pane.id.replace('collabPane-',''));},true);
-  dialog.addEventListener('keydown',e=>{const n=e.target.closest('[role="tab"]');if(!n||!['ArrowLeft','ArrowRight','Home','End'].includes(e.key))return;e.preventDefault();const all=[...dialog.querySelectorAll('[role="tab"]')],i=all.indexOf(n),next=e.key==='Home'?0:e.key==='End'?all.length-1:(i+(e.key==='ArrowRight'?1:-1)+all.length)%all.length;switchTab(all[next].dataset.tab);all[next].focus();});
+  dialog.addEventListener('keydown',e=>{const n=e.target.closest('[role="tab"]');if(!n||!['ArrowLeft','ArrowRight','Home','End'].includes(e.key))return;e.preventDefault();const all=[...dialog.querySelectorAll('[role="tab"]')],i=all.indexOf(n),next=e.key==='Home'?0:e.key==='End'?all.length-1:(i+(e.key==='ArrowRight'?1:-1)+all.length)%all.length;switchTab(all[next].dataset.tab);dialog.querySelector(`[data-tab="${all[next].dataset.tab}"]`)?.focus();});
   dialog.addEventListener('click',e=>{
     const b=e.target.closest('button');if(!b||busy)return;
     if(b.hasAttribute('data-close')){closeDialog();return;}
-    if(b.hasAttribute('data-extract')){try{const result=extractCollaboration(dialog.querySelector('#collabImportText').value);result.draft.source_name=importSourceName;void openEditor(null,result);}catch(error){dialogMessage(error.message,true);}return;}
+    if(b.hasAttribute('data-extract')){void analyzeImport();return;}
+    if(b.hasAttribute('data-apply-import')){void applyImport();return;}
+    if(b.hasAttribute('data-review-back')){const saved=proposal;openImport(importBase);dialog.querySelector('#collabImportText').value=saved.source;importSourceName=saved.source_name;return;}
+    if(b.hasAttribute('data-import-back')){void openEditor(importBase);return;}
+    if(b.hasAttribute('data-more-messages')){void moreMessages();return;}
+    if(b.dataset.message){void showMessage(b.dataset.message);return;}
+    if(b.hasAttribute('data-add-mail')){readForm();if(dirty){dialogMessage('먼저 현재 변경 내용을 저장한 뒤 메일을 추가해 주세요.',true);return;}openImport(draft);return;}
     if(b.dataset.tab){readForm();switchTab(b.dataset.tab);return;}
     if(!draft)return; readForm();
     if(b.hasAttribute('data-add-output')||b.hasAttribute('data-remove-output')||b.dataset.addLedger||b.dataset.removeLedger)resetImportReview();
@@ -292,7 +358,7 @@ export function createCollaborationManager(client) {
   admin.addEventListener('submit',e=>{e.preventDefault();const f=e.target;void mailAction('save',{sender:f.elements.sender.value.trim(),password:f.elements.password.value.replace(/\s/g,'')});});
   admin.addEventListener('click',e=>{if(e.target.closest('[data-mail-test]'))void mailAction('test');if(e.target.closest('[data-mail-pause]'))void mailAction('pause');});
   return {
-    setUser(next){if(user?.id===next?.id)return;generation++;user=next;loaded=false;loading=false;rows=[];mail=null;busy=false;dirty=false;dialog.close();dialog.replaceChildren();draft=null;modalMode='';reviewRequired=false;reviewConfirmed=false;calendarDay=today();calendarMonth=calendarDay.slice(0,7);view='active';query='';statusFilter='';notice='';admin.replaceChildren();admin.hidden=true;render();if(user)void loadMail();},
-    show(pageName){if(pageName==='collaborationView'&&user){if(!loaded&&!loading)void load();else render();}if(pageName==='catalogAdmin'&&user)void loadMail();},
+    setUser(next){if(user?.id===next?.id)return;generation++;user=next;ai.setUser(next);importBase=null;pendingMessage=null;proposal=null;messages=[];loaded=false;loading=false;rows=[];mail=null;busy=false;dirty=false;dialog.close();dialog.replaceChildren();draft=null;modalMode='';reviewRequired=false;reviewConfirmed=false;calendarDay=today();calendarMonth=calendarDay.slice(0,7);view='active';query='';statusFilter='';notice='';admin.replaceChildren();admin.hidden=true;render();if(user)void loadMail();},
+    show(pageName){if(pageName==='collaborationView'&&user){if(!loaded&&!loading)void load();else render();}if(pageName==='catalogAdmin'&&user){void loadMail();void ai.load();}},
   };
 }
