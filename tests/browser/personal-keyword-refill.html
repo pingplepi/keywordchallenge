@@ -1,0 +1,52 @@
+<!doctype html><html lang="ko"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>맞춤 추천 빈자리 검증</title>
+<link rel="stylesheet" href="../../styles.css"><link rel="stylesheet" href="../../keyword-opportunities.css"><link rel="stylesheet" href="../../ui-system.css">
+<main style="max-width:1000px;margin:24px auto"><h1>맞춤 추천 보관·빈자리 채우기 검증</h1><p>실제 컴포넌트와 테스트 응답으로 검증합니다. 실제 회원 보관함에는 저장하지 않습니다.</p><button id="run" class="button">검증 시작</button><ol id="checks"></ol><section id="personal" class="panel"></section></main>
+<script type="module">
+import {createPersonalKeywords} from '../../keyword-discovery.js';
+const root=document.querySelector('#personal'),list=document.querySelector('#checks'),$=s=>root.querySelector(s);
+const pause=()=>new Promise(r=>setTimeout(r,0));
+const words=['나트랑카페','다낭카페','베트남여행','제주산책','서울계곡','푸꾸옥여행','부산산책','발리여행','치앙마이카페','서울숲'];
+const response=items=>({data:{field:'여행',post_count:50,candidate_count:40,strengths:[],different_count:10,fresh_count:10,items:items.map(keyword=>({keyword,keyword_key:keyword,field:'여행',volume_min:1000,volume_max:1000,participant_count:50,reasons:['최근 작성한 글의 주제와 연결'],collected_at:'2026-11-01T04:00:00Z'}))}});
+let queue=[],calls=[],notified=0;
+const component=createPersonalKeywords({rpc:async(name,args)=>{calls.push({name,args:structuredClone(args)});if(!queue.length)throw Error('Unexpected query');const next=queue.shift();return typeof next==='function'?next():next;}},{root,onSaved:()=>notified++});
+const assert=(c,m)=>{if(!c)throw Error(m);},equal=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
+const keys=()=>[...root.querySelectorAll('[data-personal-save]')].map(b=>b.dataset.personalSave);
+const pass=text=>{const li=document.createElement('li');li.textContent='PASS · '+text;list.append(li);};
+const clickSave=key=>$('[data-personal-save="'+key+'"]').click();
+const idle=async()=>{for(let i=0;i<300&&$('[data-personal-refresh]').disabled;i++)await new Promise(r=>setTimeout(r,20));assert(!$('[data-personal-refresh]').disabled,'Still busy');};
+async function reset(items=words){component.setContext({id:'member'},{influencerId:'test'});queue=[response(items)];await component.load(false);}
+document.querySelector('#run').onclick=async()=>{
+ document.querySelector('#run').disabled=true;
+ try{
+  await reset();const old=keys();let completeSave;queue=[()=>new Promise(r=>completeSave=r),response([...old.filter(k=>k!==old[3]),'하노이카페'])];
+  const start=calls.length;clickSave(old[3]);clickSave(old[4]);$('[data-personal-refresh]').click();
+  assert(calls.length===start+1&&[...root.querySelectorAll('[data-personal-save]')].every(b=>b.disabled),'Parallel save permitted');
+  completeSave({data:{}});await idle();const expected=old.slice();expected[3]='하노이카페';
+  assert(equal(keys(),expected)&&calls.at(-1).args.p_rotate===false&&equal(calls.at(-1).args.p_current_keyword_keys,old.filter(k=>k!==old[3])),'Slot or other recommendations changed');
+  assert(notified===1&&$('[data-personal-status]').textContent.includes('빈자리를 채웠습니다')&&$('[data-personal-previous]').disabled,'Save notification/history');pass('담은 자리만 다음 후보로 교체 · 나머지 9개와 순서 유지 · 중복 클릭 차단');
+  const savedSnapshot=keys();queue=[{error:{message:'보관 한도 확인'}}];clickSave(savedSnapshot[0]);await idle();
+  assert(equal(keys(),savedSnapshot)&&!$('[data-personal-save]').disabled,'Failed save removed card');pass('보관 실패 시 원래 추천 유지');
+  queue=[{data:{}},{error:{message:'추천 조회 실패'}}];const saveCount=()=>calls.filter(c=>c.name==='keychallenge_save_blog_keyword').length;clickSave(savedSnapshot[1]);await idle();
+  assert(keys().length===9&&!keys().includes(savedSnapshot[1])&&$('[data-personal-refill]')&&$('[data-personal-status]').textContent.includes('보관은 완료'),'Refill failure lost saved state');
+  const savedCalls=saveCount();queue=[response([...keys(),'하노이마사지'])];$('[data-personal-refill]').click();await idle();
+  const retried=savedSnapshot.slice();retried[1]='하노이마사지';assert(equal(keys(),retried)&&saveCount()===savedCalls,'Retry saved twice or moved cards');pass('후보 조회 실패는 남은 9개 유지 · 재시도는 다시 보관하지 않고 빈자리만 채움');
+  queue=[response(['도쿄카페','오사카카페'])];await component.load(true);queue=[{data:{}},response(['오사카카페','후쿠오카카페'])];clickSave('도쿄카페');await idle();
+  $('[data-personal-previous]').click();assert(equal(keys(),retried)&&$('[data-personal-previous]').disabled,'Refill polluted previous history');pass('자동 채우기는 이전 추천 이력을 추가하지 않음');
+  // A saved keyword can still be seen in an older snapshot, with its saved badge.
+  await reset(['서울계곡','다낭카페']);queue=[response(['다낭카페','발리여행'])];await component.load(true);
+  queue=[{data:{}},response(['발리여행','푸꾸옥여행'])];clickSave('다낭카페');await idle();$('[data-personal-previous]').click();
+  assert(equal(keys(),['서울계곡','다낭카페'])&&$('[data-personal-save="다낭카페"]').disabled&&$('[data-personal-save="다낭카페"]').textContent==='보관됨 ✓','Historical saved badge lost');
+  queue=[{data:{}},response(['제주숲길','부산산책'])];clickSave('서울계곡');await idle();assert(equal(keys(),['제주숲길','부산산책']),'Saving in old snapshot failed');pass('이전 추천의 보관 상태 표시 · 이전 목록에서도 다음 후보로 교체');
+  await reset(['서울숲','제주숲길']);queue=[{data:{}},response(['제주숲길'])];clickSave('서울숲');await idle();assert(equal(keys(),['제주숲길'])&&$('[data-personal-status]').textContent.includes('다음 후보가 없어'),'Exhausted candidate mismatch');
+  queue=[{data:{}},response([])];clickSave('제주숲길');await idle();assert(!keys().length&&$('[data-personal-status]').textContent.includes('0개'),'Last saved item reappeared');pass('후보 소진 시 보관한 키워드를 반복하지 않고 남은 개수 안내');
+  await reset();let finishOld;queue=[()=>new Promise(r=>finishOld=r)];clickSave(words[0]);const before=calls.length;
+  component.setContext({id:'new-member'},{mode:'blogger'});queue=[response(['새회원키워드'])];await component.load(false);finishOld({data:{}});await pause();
+  assert(equal(keys(),['새회원키워드'])&&calls.length===before+1,'Old save affected new member');pass('보관 중 계정 전환 시 이전 응답과 자동 채우기 차단');
+  await reset();let finishRefill;queue=[{data:{}},()=>new Promise(r=>finishRefill=r)];clickSave(words[0]);await pause();component.setContext(null,null);finishRefill(response(['이전계정키워드']));await pause();
+  assert(!keys().length&&!$('[data-personal-status]').textContent,'Refill response leaked after logout');pass('자동 채우기 중 로그아웃 시 이전 응답 차단');
+  assert(calls.every(c=>['keychallenge_personalized_keyword_batch','keychallenge_save_blog_keyword'].includes(c.name)),'Unexpected API');pass('보관·저장된 추천 조회만 사용 · 검색 API 추가 호출 없음');
+  await reset();queue=[{data:{}},response([...words.slice(1),'하노이카페'])];clickSave(words[0]);await idle();
+  document.title=list.children.length+'개 검증 통과';
+ }catch(error){const li=document.createElement('li');li.textContent='FAIL · '+error.message;list.append(li);document.title='검증 실패';}
+};
+</script></html>

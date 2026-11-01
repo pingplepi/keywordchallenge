@@ -14,8 +14,10 @@ begin
   first_batch:=public.keychallenge_personalized_keyword_batch(influencer,'__mine__');
   candidates:=(first_batch->>'candidate_count')::integer;
   if candidates<1 then raise exception 'Test user needs related keyword candidates'; end if;
-  if first_batch->'items' is distinct from public.keychallenge_personalized_keywords(influencer,'__mine__')->'items' then
-    raise exception 'Initial relevance order changed';
+  if exists(select 1 from jsonb_array_elements(first_batch->'items') x
+    join public.keychallenge_blog_keywords k on k.keyword_key=x->>'keyword_key'
+    where k.user_id=(select auth.uid()) and not k.archived) then
+    raise exception 'Saved keyword returned in new recommendations';
   end if;
   select array_agg(x->>'keyword_key') into seen from jsonb_array_elements(first_batch->'items') x;
   second_batch:=public.keychallenge_personalized_keyword_batch(influencer,'__mine__',seen,seen,true);
@@ -46,4 +48,4 @@ begin
     if sqlerrm<>'추천 새로고침 조건을 확인해 주세요.' then raise; end if;
   end;
 end $test$;
-select 'Initial order, unseen-first rotation, stable background reload, field/evidence, and history limit passed' as result;
+select 'Saved exclusion, unseen-first rotation, stable background reload, field/evidence, and history limit passed' as result;
