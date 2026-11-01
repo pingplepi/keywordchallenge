@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="ko"><meta charset="utf-8"><title>맞춤 추천 순환 검증</title>
+<link rel="stylesheet" href="../../styles.css"><link rel="stylesheet" href="../../keyword-opportunities.css">
+<main style="max-width:1000px;margin:24px auto"><h1>맞춤 추천 순환 검증</h1><p>저장소 루트에서 로컬 HTTP 서버로 열어 실행합니다. 외부 API나 실제 회원 데이터를 사용하지 않습니다.</p><button id="run" class="button">검증 시작</button><ol id="checks"></ol><section id="personal" class="panel"></section></main>
+<script type="module">
+import {createPersonalKeywords} from '../../keyword-discovery.js';
+const root=document.querySelector('#personal'),list=document.querySelector('#checks');
+const pause=ms=>new Promise(resolve=>setTimeout(resolve,ms));
+const response=(words,different=words.length,fresh=different)=>({data:{field:'여행',post_count:50,candidate_count:100,strengths:[],different_count:different,fresh_count:fresh,items:words.map(keyword=>({keyword,keyword_key:keyword,field:'여행',travel_scope:'세계여행',volume_min:2000,volume_max:2000,participant_count:100,reasons:['최근 글의 주제와 연결'],collected_at:'2026-11-01T04:00:00Z'}))}});
+let queue=[],calls=[];
+const client={rpc:async(name,args)=>{calls.push({name,args:structuredClone(args)});if(!queue.length)throw Error('Unexpected query');const next=queue.shift();return typeof next==='function'?next():next;}};
+const component=createPersonalKeywords(client,{root});
+const select=s=>root.querySelector(s),status=()=>select('[data-personal-status]').textContent;
+const assert=(condition,message)=>{if(!condition)throw Error(message);};
+const equal=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
+const pass=text=>{const item=document.createElement('li');item.textContent='PASS · '+text;list.append(item);};
+async function clickRefresh(){select('[data-personal-refresh]').click();await pause(0);}
+const waitIdle=async()=>{for(let i=0;i<100&&select('[data-personal-refresh]').disabled;i++)await pause(50);assert(!select('[data-personal-refresh]').disabled,'request did not finish');};
+document.querySelector('#run').onclick=async()=>{
+ document.querySelector('#run').disabled=true;
+ const realNow=Date.now;let clock=realNow();Date.now=()=>clock;
+ try{
+  component.setContext({id:'influencer'},{influencerId:'example'});
+  queue=[response(['나트랑카페','베트남카페'])];await component.load(false);
+  assert(!calls[0].args.p_rotate&&!calls[0].args.p_seen_keyword_keys.length&&!select('[data-personal-updated]').hidden,'initial load');pass('첫 진입: 기록에 맞는 추천과 확인 시각 표시');
+  queue=[response(['다낭여행','나트랑마사지'])];await clickRefresh();await waitIdle();
+  assert(calls[1].args.p_rotate&&equal(calls[1].args.p_seen_keyword_keys,['나트랑카페','베트남카페'])&&equal(calls[1].args.p_current_keyword_keys,['나트랑카페','베트남카페']),'rotation params');
+  assert(root.textContent.includes('다낭여행')&&!select('[data-personal-cards]').textContent.includes('나트랑카페')&&status().includes('2개의 다른 키워드'),'new batch not displayed');pass('버튼을 누르면 이전 후보를 전달하고 다른 추천 표시');
+  const beforeCache=calls.length;await component.load(false);assert(calls.length===beforeCache,'unnecessary automatic query');
+  clock+=61000;queue=[response(['다낭여행','나트랑마사지'],0,0)];await component.load(false);
+  assert(!calls.at(-1).args.p_rotate&&equal(calls.at(-1).args.p_current_keyword_keys,['다낭여행','나트랑마사지']),'background changed batch');pass('탭 재진입은 캐시 사용 · 시간 경과 후에도 현재 추천 유지 요청');
+  queue=[{error:{code:'57014'}},response(['베트남마사지','인천실내데이트'])];const retryStart=calls.length;await clickRefresh();await waitIdle();
+  assert(calls.length===retryStart+2&&equal(calls[retryStart].args,calls[retryStart+1].args),'retry skipped batch');pass('시간 초과 재시도는 같은 조건 사용 · 성공 후에만 이력 반영');
+  const beforeFailure=select('[data-personal-cards]').innerHTML,timeBeforeFailure=select('[data-personal-updated]').textContent;
+  queue=[{error:{code:'57014'}},{error:{code:'57014'}}];await clickRefresh();await waitIdle();
+  assert(select('[data-personal-cards]').innerHTML===beforeFailure&&select('[data-personal-updated]').textContent===timeBeforeFailure&&status().includes('이전에 확인한 추천'),'failure removed current batch');pass('실패해도 현재 추천·확인 시각 유지');
+  queue=[response(['서울근교여행','베트남마사지'],1,1)];await clickRefresh();await waitIdle();assert(status().includes('1개의 다른 키워드')&&status().includes('후보가 부족'),'partial notice');pass('후보가 적으면 새 후보 수와 일부 중복 안내');
+  queue=[response(['서울근교여행','베트남마사지'],0,0)];await clickRefresh();await waitIdle();assert(status().includes('다른 후보가 부족'),'exhausted notice');pass('다른 후보가 없으면 기존 추천 재표시 안내');
+  queue=[response(['나트랑카페','베트남카페'],2,0)];await clickRefresh();await waitIdle();assert(status().includes('이전에 본 후보도'),'recycled notice');pass('후보를 다 본 뒤에는 이전에 본 후보 포함 안내');
+  let resolveOld;queue=[()=>new Promise(resolve=>resolveOld=resolve)];const duplicateStart=calls.length;
+  const pending=component.load(true);await component.load(true);assert(calls.length===duplicateStart+1,'duplicate request');
+  component.setContext({id:'blogger'},{blog_id:'example-blog',mode:'blogger'});queue=[response(['여행준비'])];await component.load(false);resolveOld(response(['오래된키워드']));await pending;
+  assert(root.textContent.includes('여행준비')&&!root.textContent.includes('오래된키워드')&&!calls.at(-1).args.p_seen_keyword_keys.length&&calls.at(-1).args.p_influencer_id===null,'context leak');pass('중복 요청 차단 · 계정 전환 시 추천 이력 초기화 및 이전 응답 차단');
+  queue=[{error:{code:'57014'}}];const logoutStart=calls.length;const abandoned=component.load(true);await pause(0);component.setContext(null,null);await abandoned;
+  assert(calls.length===logoutStart+1&&!select('[data-personal-cards]').textContent&&!status(),'logout retry');pass('재시도 대기 중 로그아웃하면 재조회 중단');
+  assert(calls.every(c=>c.name==='keychallenge_personalized_keyword_batch'),'unexpected external API');pass('맞춤 추천 조회만 호출 · 검색 API 추가 사용 없음');
+  document.title='11개 검증 통과';
+ }catch(error){const li=document.createElement('li');li.textContent='FAIL · '+error.message;list.append(li);document.title='검증 실패';}
+ finally{Date.now=realNow;}
+};
+</script></html>
