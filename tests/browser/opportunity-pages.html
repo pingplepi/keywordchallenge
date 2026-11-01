@@ -1,0 +1,43 @@
+<!doctype html><html lang="ko"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>기회 찾기 페이지 검증</title>
+<link rel="stylesheet" href="../../styles.css"><link rel="stylesheet" href="../../keyword-opportunities.css"><link rel="stylesheet" href="../../ui-system.css">
+<main style="max-width:1100px;margin:24px auto;padding:16px"><h1>기회 찾기 페이지 검증</h1><button id="run" class="button">검증 시작</button><ol id="checks"></ol><div id="explore"></div><section class="panel work-panel" id="influencerOps"></section><section class="panel work-panel" id="bloggerOps"></section></main>
+<script type="module">
+import {createKeywordOpportunities} from '../../keyword-opportunities.js';
+import {createTopicDiscovery} from '../../keyword-discovery.js';
+const pause=ms=>new Promise(r=>setTimeout(r,ms)),assert=(ok,msg)=>{if(!ok)throw Error(msg);};
+const equal=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
+const checks=document.querySelector('#checks'),pass=msg=>{const li=document.createElement('li');li.textContent='PASS · '+msg;checks.append(li);};
+const row=(kind,i)=>({keyword_id:kind+i,keyword_key:kind+i,name:({blue:'여행기회',longtail:'아이랑여행',red:'인기여행'}[kind])+i,field:'여행',participant_count:50,volume_min:5000,volume_max:5000,volume_collected_at:'2026-11-01',joined:false,title_matched:false,is_mine:true,reasons:['선택 분야의 키워드','참여자 대비 검색 수요가 분야 상위 25%']});
+const fixtures={blue:Array.from({length:23},(_,i)=>row('blue',i+1)),longtail:Array.from({length:12},(_,i)=>row('longtail',i+1)),red:Array.from({length:3},(_,i)=>row('red',i+1))};
+let saved=new Set(['blue1','blue2']),calls=[],failNext=false,holdNext=false,releasePending;
+const response=args=>{const filtered=Object.fromEntries(Object.entries(fixtures).map(([k,v])=>[k,v.filter(r=>!args.p_hide_saved||!saved.has(r.keyword_key))]));const kind=args.p_kind,total_pages=Math.max(1,Math.ceil(filtered[kind].length/10)),page=Math.min(args.p_page,total_pages);return {data:{kind,page,total_pages,hide_saved:args.p_hide_saved,page_size:10,counts:Object.fromEntries(Object.entries(filtered).map(([k,v])=>[k,v.length])),total_counts:Object.fromEntries(Object.entries(fixtures).map(([k,v])=>[k,v.length])),field:'여행',complete:true,measured:100,post_count:14,catalog_collected_at:'2026-11-01',blue:[],longtail:[],red:[],[kind]:filtered[kind].slice((page-1)*10,page*10).map(r=>({...r,saved:saved.has(r.keyword_key)}))}};};
+const client={rpc:async(name,args)=>{
+ calls.push({name,args:structuredClone(args)});
+ if(name==='keychallenge_personalized_keyword_batch')return {data:{items:[],strengths:[],field:'여행'}};
+ if(name==='keychallenge_save_blog_keyword'){const row=Object.values(fixtures).flat().find(r=>r.name===args.p_keyword);saved.add(row.keyword_key);return {data:{}};}
+ assert(name.endsWith('_opportunities_page'),'unexpected RPC');
+ if(failNext){failNext=false;return {error:{message:'test failure'}};}
+ if(holdNext){holdNext=false;const result=response(args);return new Promise(resolve=>releasePending=()=>resolve(result));}
+ return response(args);
+}};
+const host=createTopicDiscovery(client,{root:document.querySelector('#explore')});
+const components={influencer:createKeywordOpportunities(client,{rootId:'influencerOps',mode:'influencer'}),blogger:createKeywordOpportunities(client,{rootId:'bloggerOps',mode:'blogger'})};
+let mode='blogger';const root=()=>document.querySelector('#'+mode+'Ops'),q=s=>root().querySelector(s),keys=()=>[...root().querySelectorAll('[data-opportunity-save]')].map(b=>b.dataset.opportunitySave),info=()=>q('[data-opportunity-page-info]').textContent;
+const idle=async()=>{for(let i=0;i<100&&(q('[role="tabpanel"]').getAttribute('aria-busy')==='true'||q('[data-opportunity-hide-saved]').disabled);i++)await pause(10);assert(!q('[data-opportunity-hide-saved]').disabled,'request did not finish');};
+const click=async selector=>{q(selector).click();await pause(0);await idle();};
+const setHide=async value=>{q('[data-opportunity-hide-saved]').checked=value;q('[data-opportunity-hide-saved]').dispatchEvent(new Event('change',{bubbles:true}));await pause(0);await idle();};
+const openMode=async value=>{mode=value;for(const c of Object.values(components))c.setContext(null,null);host.setContext({id:value},{mode:value,interest:'여행',blog_id:'example'});components[value].setContext({id:value},{mode:value,interest:'여행',blog_id:'example',influencerId:'example'});host.show('keywordSearchView');document.querySelector('[data-discovery-tab="opportunity"]').click();await pause(0);await idle();};
+document.querySelector('#run').onclick=async()=>{document.querySelector('#run').disabled=true;try{
+ await openMode('blogger');assert(keys().length===10&&keys()[0]==='blue3'&&info()==='1 / 3 페이지'&&q('[data-opportunity-page="-1"]').disabled,'initial page/filter');pass('기본은 보관 키워드 제외 · 10개와 전체 페이지 수 표시');
+ const first=keys();await click('[data-opportunity-page="1"]');const second=keys();assert(info()==='2 / 3 페이지'&&!second.some(k=>first.includes(k)),'next page repeated');await click('[data-opportunity-page="1"]');assert(equal(keys(),['blue23'])&&q('[data-opportunity-page="1"]').disabled,'last page');await click('[data-opportunity-page="-1"]');assert(equal(keys(),second),'previous page');pass('이전·다음으로 전체 후보 탐색 · 마지막 페이지에서 멈춤');
+ await click('[data-opportunity-tab="longtail"]');await click('[data-opportunity-page="1"]');assert(info()==='2 / 2 페이지','longtail page');await click('[data-opportunity-tab="blue"]');assert(equal(keys(),second),'category page forgotten');pass('유형별 페이지 위치 유지');
+ await click('[data-opportunity-save="blue13"]');assert(!keys().includes('blue13')&&keys().includes('blue23')&&keys().length===10&&info()==='2 / 2 페이지','save refill');await click('[data-opportunity-page="-1"]');const afterFirst=keys();await click('[data-opportunity-page="1"]');assert(new Set([...afterFirst,...keys()]).size===20,'save skipped candidate');pass('보관하면 다음 후보로 채움 · 페이지 이동 시 누락·중복 없음');
+ await setHide(false);assert(info()==='1 / 3 페이지'&&keys().includes('blue1')&&q('[data-opportunity-save="blue1"]').disabled,'include saved');pass('체크 해제하면 보관된 키워드도 함께 보기');
+ failNext=true;const before=keys();await click('[data-opportunity-page="1"]');assert(equal(keys(),before)&&q('[data-opportunity-retry]'),'error lost page');await click('[data-opportunity-retry]');assert(info()==='2 / 3 페이지','retry wrong page');pass('조회 실패 시 기존 목록 유지 · 요청한 페이지 재시도');
+ for(const r of fixtures.red)saved.add(r.keyword_key);await setHide(true);await click('[data-opportunity-tab="red"]');assert(!keys().length&&root().textContent.includes('보관하지 않은 후보를 모두 확인'),'empty saved');await setHide(false);assert(keys().length===3,'empty filter recovery');pass('모두 보관한 탭은 안내 표시 · 전체 보기로 복귀');
+ saved=new Set(['blue1','blue2']);await openMode('influencer');await click('[data-opportunity-page="1"]');await click('[data-opportunity-page="1"]');await click('[data-opportunity-save="blue23"]');assert(info()==='2 / 2 페이지'&&keys().length===10,'last save clamp');assert(calls.some(c=>c.name==='keychallenge_keyword_opportunities_page'&&c.args.p_influencer_id==='example'),'influencer parameters');pass('인플루언서도 동일 동작 · 마지막 후보 보관 시 앞 페이지로 이동');
+ holdNext=true;q('[data-opportunity-page="-1"]').click();await pause(0);const pendingCalls=calls.length;assert(q('[data-opportunity-page="1"]').disabled&&q('[data-opportunity-tab="red"]').disabled,'pending controls enabled');q('[data-opportunity-page="1"]').click();assert(calls.length===pendingCalls,'duplicate call');components.influencer.setContext(null,null);releasePending();await pause(0);assert(!keys().length&&!q('[role="status"]').textContent,'stale response leak');pass('연속 클릭 차단 · 로그아웃 후 이전 응답 표시 안 함');
+ assert(calls.every(c=>['keychallenge_blogger_keyword_opportunities_page','keychallenge_keyword_opportunities_page','keychallenge_save_blog_keyword','keychallenge_personalized_keyword_batch'].includes(c.name)),'external API called');pass('저장된 DB 데이터만 사용');
+ await openMode('blogger');await click('[data-opportunity-page="1"]');document.title=checks.children.length+'개 검증 통과';
+}catch(e){const li=document.createElement('li');li.textContent='FAIL · '+e.message;checks.append(li);document.title='검증 실패';}};
+</script></html>

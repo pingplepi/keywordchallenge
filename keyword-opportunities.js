@@ -11,14 +11,17 @@ const kinds = [
 
 export function createKeywordOpportunities(client, {remember=()=>{},onDetail,onSaved=()=>{},rootId='strategyOpportunities',mode='influencer'}) {
   const root = document.getElementById(rootId),blogger=mode==='blogger';
-  let contextKey='',pendingField=null,recommendationTab=null,loadedAt=0;
+  let contextKey='',pendingField=null,recommendationTab=null,loadedAt=0,hideSaved=true,retryTarget=null;
+  let pages={blue:1,longtail:1,red:1};
+  const pager=`<nav class="opportunity-pagination" aria-label="기회 키워드 페이지"><button type="button" class="button button-quiet" data-opportunity-page="-1" disabled>이전</button><span data-opportunity-page-info>1 / 1 페이지</span><button type="button" class="button button-light" data-opportunity-page="1" disabled>다음</button></nav>`;
   root.classList.add('keyword-opportunities');
   let user=null,profile=null,context=0,request=0,active='blue',data=null,field='__mine__',loading=false,saveRevision=0,visible=false;
   const rows=new Map(),saving=new Set(),savedOverrides=new Map();
   root.innerHTML = `<div class="section-heading"><div><p class="eyebrow">KEYWORD OPPORTUNITIES</p><h2>키워드 기회 찾기</h2><p class="muted">${blogger?'관심 분야와 최근 글에서, 다음에 다룰 새로운 주제를 찾아보세요.':'내 분야의 미참여 키워드부터, 다음에 도전할 주제를 찾아보세요.'}</p></div><a class="button button-light" href="#savedKeywordsView">보관함 보기 ↗</a></div>
     <div class="opportunity-tabs" role="tablist" aria-label="추천 키워드 유형">${kinds.map(([id,label],i)=>`<button id="opportunityTab-${id}" type="button" role="tab" aria-selected="${i===0}" aria-controls="opportunityPanel" tabindex="${i===0?0:-1}" data-opportunity-tab="${id}">${label}<span data-opportunity-count="${id}"></span></button>`).join('')}</div>
-    <div id="opportunityPanel" role="tabpanel" aria-labelledby="opportunityTab-blue" tabindex="0" aria-busy="true"><p id="opportunityDescription" class="muted opportunity-description"></p><p id="opportunitySummary" class="opportunity-summary"></p><p id="opportunityStatus" class="message opportunity-status" role="status"></p><div id="opportunityCards" class="opportunity-grid"></div></div>
-    <details class="score-note opportunity-method"><summary>추천 기준과 데이터 범위</summary><p>같은 분야에서 최근 30일 안에 검색량과 참여자 수가 확인된 키워드 10개 이상을 비교합니다. 월 검색량은 네이버 검색광고 PC·모바일 합계이며, 최소 10회 이상 확인된 키워드를 사용합니다. 전체 키챌 목록의 수집일이 30일을 넘으면 추천을 보류합니다.</p><p>블루오션은 검색량이 분야 중간값 이상, 참여자가 중간값 이하이고 참여자 대비 검색 수요가 상위 25%인 후보입니다. 레드오션은 검색량과 참여자 수가 모두 상위 25%인 후보입니다.</p><p>롱테일은 ‘아이랑’, ‘당일치기’, ‘만드는법’ 등 대상·목적·조건 표현과 별도의 주제 표현이 있으며, 검색량이 분야 중간값 이하인 후보입니다. 표현 규칙으로 선별하므로 실제 검색 의도와 다를 수 있고, 다른 탭에도 포함될 수 있습니다.</p>${blogger?'<p>내 설정의 관심 분야에서 수집된 최근 글 최대 50편의 제목을 비교합니다. 제목에 키워드가 없는 후보를 먼저, 최근 글과 연결되는 표현이 있는 후보를 그다음으로 우선합니다. 각 탭에서 최대 10개를 보여드립니다.</p><p>공백과 영문 대소문자를 정리한 제목 포함 여부와 단어 비교입니다. 본문·과거 전체 글이나 의미가 비슷한 표현까지 확인한 결과는 아닙니다. 글이 아직 수집되지 않았다면 관심 분야만으로 추천하고 작성 여부는 비교 전으로 표시합니다.</p>':'<p>인플홈의 참여 기록으로 내 주요 분야를 추정합니다. 기록이 없으면 내 설정의 관심 분야를 참고합니다. 내 분야와 미참여 후보를 우선하고, 블루오션·롱테일은 참여자 대비 수요순, 레드오션은 검색량순으로 최대 10개를 보여드립니다. 참여 여부는 인플홈 수집 시점 기준입니다.</p>'}<p>여행 분야는 키워드의 지명·표현을 참고해 국내여행, 세계여행, 여행 공통·기타 후보를 번갈아 배치합니다. 공식 세부 분류가 아니며 일부 지명은 기타로 남을 수 있습니다. 같은 그룹 안에서는 기존 추천 순서를 유지합니다.</p><p>키챌 참여자 수를 활용한 참고용 분류이며 네이버 전체 검색 경쟁도나 상위 노출을 보장하는 지표는 아닙니다. 추천 조회와 보관은 저장된 데이터를 사용하며 검색 노출 점검 횟수를 차감하지 않습니다.</p></details>`;
+    <div class="opportunity-browse-controls"><label class="opportunity-saved-filter"><input type="checkbox" data-opportunity-hide-saved checked />보관한 키워드 제외</label><p class="muted small">10개씩 넘겨 보세요. 탭 숫자는 현재 조건의 후보 수이며, 체크를 해제하면 보관한 키워드도 함께 볼 수 있습니다.</p></div>
+    <div id="opportunityPanel" role="tabpanel" aria-labelledby="opportunityTab-blue" tabindex="0" aria-busy="true"><p id="opportunityDescription" class="muted opportunity-description"></p><p id="opportunitySummary" class="opportunity-summary"></p><p id="opportunityStatus" class="message opportunity-status" role="status"></p>${pager}<div id="opportunityCards" class="opportunity-grid"></div>${pager}</div>
+    <details class="score-note opportunity-method"><summary>추천 기준과 데이터 범위</summary><p>같은 분야에서 최근 30일 안에 검색량과 참여자 수가 확인된 키워드 10개 이상을 비교합니다. 월 검색량은 네이버 검색광고 PC·모바일 합계이며, 최소 10회 이상 확인된 키워드를 사용합니다. 전체 키챌 목록의 수집일이 30일을 넘으면 추천을 보류합니다.</p><p>블루오션은 검색량이 분야 중간값 이상, 참여자가 중간값 이하이고 참여자 대비 검색 수요가 상위 25%인 후보입니다. 레드오션은 검색량과 참여자 수가 모두 상위 25%인 후보입니다.</p><p>롱테일은 ‘아이랑’, ‘당일치기’, ‘만드는법’ 등 대상·목적·조건 표현과 별도의 주제 표현이 있으며, 검색량이 분야 중간값 이하인 후보입니다. 표현 규칙으로 선별하므로 실제 검색 의도와 다를 수 있고, 다른 탭에도 포함될 수 있습니다.</p>${blogger?'<p>내 설정의 관심 분야에서 수집된 최근 글 최대 50편의 제목을 비교합니다. 제목에 키워드가 없는 후보를 먼저, 최근 글과 연결되는 표현이 있는 후보를 그다음으로 우선합니다. 각 탭의 전체 후보를 10개씩 나누어 보여드립니다.</p><p>공백과 영문 대소문자를 정리한 제목 포함 여부와 단어 비교입니다. 본문·과거 전체 글이나 의미가 비슷한 표현까지 확인한 결과는 아닙니다. 글이 아직 수집되지 않았다면 관심 분야만으로 추천하고 작성 여부는 비교 전으로 표시합니다.</p>':'<p>인플홈의 참여 기록으로 내 주요 분야를 추정합니다. 기록이 없으면 내 설정의 관심 분야를 참고합니다. 내 분야와 미참여 후보를 우선하고, 블루오션·롱테일은 참여자 대비 수요순, 레드오션은 검색량순으로 전체 후보를 10개씩 나누어 보여드립니다. 참여 여부는 인플홈 수집 시점 기준입니다.</p>'}<p>보관한 키워드 제외를 켜면 보관함에 있는 후보는 제외하고 남은 후보 수를 표시합니다. 보관 시 현재 페이지에 다음 후보를 채웁니다. 페이지를 넘겨도 모든 후보를 볼 수 있으며, 검색량 등 원본 데이터가 갱신되면 순서가 달라질 수 있습니다.</p><p>여행 분야는 키워드의 지명·표현을 참고해 국내여행, 세계여행, 여행 공통·기타 후보를 번갈아 배치합니다. 공식 세부 분류가 아니며 일부 지명은 기타로 남을 수 있습니다. 같은 그룹 안에서는 기존 추천 순서를 유지합니다.</p><p>키챌 참여자 수를 활용한 참고용 분류이며 네이버 전체 검색 경쟁도나 상위 노출을 보장하는 지표는 아닙니다. 추천 조회와 보관은 저장된 데이터를 사용하며 검색 노출 점검 횟수를 차감하지 않습니다.</p></details>`;
   // Both dashboards exist in the DOM; keep tab IDs and ARIA references unique.
   root.querySelectorAll('[id]').forEach(element=>{element.id=rootId+'-'+element.id;});
   for(const attribute of ['aria-controls','aria-labelledby'])root.querySelectorAll('['+attribute+']').forEach(element=>{
@@ -31,7 +34,7 @@ export function createKeywordOpportunities(client, {remember=()=>{},onDetail,onS
   function syncTabs() {
     for (const [id] of kinds) {
       const button=$('opportunityTab-'+id),selected=id===active;
-      button.setAttribute('aria-selected',String(selected));button.tabIndex=selected?0:-1;
+      button.setAttribute('aria-selected',String(selected));button.tabIndex=selected?0:-1;button.disabled=loading||saving.size>0;
       root.querySelector('[data-opportunity-count="'+id+'"]').textContent=data?` ${number(data.counts[id])}`:'';
     }
     $('opportunityPanel').setAttribute('aria-labelledby',rootId+'-opportunityTab-'+active);
@@ -40,43 +43,64 @@ export function createKeywordOpportunities(client, {remember=()=>{},onDetail,onS
   function render() {
     syncTabs();
     $('opportunityPanel').setAttribute('aria-busy',String(loading));
-    if(!data)return;
+    const busy=loading||saving.size>0;
+    const ready=data&&data.kind===active&&data.hide_saved===hideSaved;
+    root.querySelector('[data-opportunity-hide-saved]').checked=hideSaved;
+    root.querySelector('[data-opportunity-hide-saved]').disabled=busy;
+    for(const nav of root.querySelectorAll('.opportunity-pagination')){
+      nav.hidden=!ready;
+      nav.querySelector('[data-opportunity-page-info]').textContent=ready?`${number(data.page)} / ${number(data.total_pages)} 페이지`:'';
+      nav.querySelector('[data-opportunity-page="-1"]').disabled=busy||!ready||data.page<=1;
+      nav.querySelector('[data-opportunity-page="1"]').disabled=busy||!ready||data.page>=data.total_pages;
+    }
+    if(!ready){$('opportunityCards').innerHTML='';$('opportunitySummary').textContent='';return;}
     const items=data[active] || [];
     const scope=data.field || (blogger?'관심 분야 미설정':data.my_field?`모든 분야 · ${data.my_field} 우선`:'모든 분야');
     const basis=blogger?(data.post_count?`최근 글 ${number(data.post_count)}편 · 제목에 없는 키워드 우선`:'글 수집 전 · 작성 여부 비교 전'):(data.complete?'미참여 우선':'참여 기록이 일부라 미참여 여부는 확인 전');
-    $('opportunitySummary').textContent=`${scope} · 추천 후보 ${number(data.counts[active])}개 중 ${number(items.length)}개 · ${basis}`;
+    const total=data.counts[active],start=items.length?(data.page-1)*10+1:0,end=items.length?start+items.length-1:0;
+    $('opportunitySummary').textContent=`${scope} · ${hideSaved?'보관한 키워드 제외 · ':''}추천 후보 ${number(total)}개${items.length?` 중 ${number(start)}–${number(end)}개`:''} · ${basis}`;
     $('opportunityCards').innerHTML=items.length?items.map(row=>{
-      const saved=row.saved||savedOverrides.has(row.keyword_key),busy=saving.has(row.keyword_key);
+      const saved=row.saved||savedOverrides.has(row.keyword_key),busy=loading||saving.size>0;
       const isNew=blogger?row.title_matched===false:row.joined===false;
       const participation=blogger?(row.title_matched===false?'최근 글 제목에 없음':row.title_matched===true?'최근 글 제목에 포함':'작성 여부 비교 전'):row.joined===false?'미참여':row.joined===true?(row.current_rank?`참여 · ${number(row.current_rank)}위`:'참여'):'참여 확인 전';
-      return `<article class="opportunity-card"><div class="opportunity-card-head"><span class="count-chip">${esc(row.travel_scope||row.field)}${row.is_mine?(blogger?' · 관심 분야':' · 내 분야'):''}</span><span class="opportunity-participation ${isNew?'is-new':''}">${participation}</span></div><h3><button type="button" class="keyword-button" data-opportunity-detail="${esc(row.keyword_id)}">${esc(row.name)}</button></h3><dl class="opportunity-metrics"><div><dt>월 검색량</dt><dd>${volume(row)}</dd></div><div><dt>키챌 참여자</dt><dd>${number(row.participant_count)}<small>명</small></dd></div></dl><ul class="opportunity-reasons">${row.reasons.map(reason=>`<li>${esc(reason)}</li>`).join('')}</ul><div class="opportunity-card-footer"><small class="muted">검색량 ${date(row.volume_collected_at)} · 참여자 ${date(data.catalog_collected_at)} 기준</small><button type="button" class="button button-light" data-opportunity-save="${esc(row.keyword_id)}" aria-label="${esc(row.name)} ${saved?'보관됨':'보관함 담기'}" ${saved||busy?'disabled':''}>${saved?'보관됨 ✓':busy?'저장 중…':'보관함 담기'}</button></div></article>`;
-    }).join(''):blogger&&!data.field?'<div class="strategy-empty opportunity-empty">관심 분야를 선택하면 맞춤 키워드를 추천해 드립니다. <a href="#accountView">관심 분야 설정하기 ↗</a></div>':`<div class="strategy-empty opportunity-empty">${data.measured?'이 분야에서 해당 기준을 충족하는 후보가 아직 없습니다. 다른 탭이나 분야를 선택해 보세요.':'추천에 사용할 최신 검색량·참여자 데이터가 아직 충분하지 않습니다. 데이터가 갱신되면 후보가 표시됩니다.'}</div>`;
+      return `<article class="opportunity-card"><div class="opportunity-card-head"><span class="count-chip">${esc(row.travel_scope||row.field)}${row.is_mine?(blogger?' · 관심 분야':' · 내 분야'):''}</span><span class="opportunity-participation ${isNew?'is-new':''}">${participation}</span></div><h3><button type="button" class="keyword-button" data-opportunity-detail="${esc(row.keyword_id)}">${esc(row.name)}</button></h3><dl class="opportunity-metrics"><div><dt>월 검색량</dt><dd>${volume(row)}</dd></div><div><dt>키챌 참여자</dt><dd>${number(row.participant_count)}<small>명</small></dd></div></dl><ul class="opportunity-reasons">${row.reasons.map(reason=>`<li>${esc(reason)}</li>`).join('')}</ul><div class="opportunity-card-footer"><small class="muted">검색량 ${date(row.volume_collected_at)} · 참여자 ${date(data.catalog_collected_at)} 기준</small><button type="button" class="button button-light" data-opportunity-save="${esc(row.keyword_id)}" aria-label="${esc(row.name)} ${saved?'보관됨':'보관함 담기'}" ${saved||busy?'disabled':''}>${saved?'보관됨 ✓':saving.has(row.keyword_key)?'저장 중…':'보관함 담기'}</button></div></article>`;
+    }).join(''):blogger&&!data.field?'<div class="strategy-empty opportunity-empty">관심 분야를 선택하면 맞춤 키워드를 추천해 드립니다. <a href="#accountView">관심 분야 설정하기 ↗</a></div>':`<div class="strategy-empty opportunity-empty">${hideSaved&&data.total_counts[active]>0?'보관하지 않은 후보를 모두 확인했습니다. 보관한 키워드 제외를 해제하면 전체 후보를 다시 볼 수 있습니다.':data.measured?'이 분야에서 해당 기준을 충족하는 후보가 아직 없습니다. 다른 탭이나 분야를 선택해 보세요.':'추천에 사용할 최신 검색량·참여자 데이터가 아직 충분하지 않습니다. 데이터가 갱신되면 후보가 표시됩니다.'}</div>`;
   }
-  async function load(nextField=field) {
+  async function load(nextField=field,options={}) {
     if(!visible||recommendationTab!=='opportunity'||!user||!profile||(blogger&&profile.mode!=='blogger'))return;
     if(loading){pendingField=nextField;return;}
-    const v=++request,g=context,startedAtRevision=saveRevision;field=nextField;loading=true;data=null;rows.clear();
-    $('opportunityCards').innerHTML='';$('opportunitySummary').textContent='';
-    syncTabs();$('opportunityPanel').setAttribute('aria-busy','true');message('저장된 데이터에서 추천 후보를 찾고 있어요…');
+    const old={data,active,field,hideSaved,pages:{...pages}};
+    const changedField=nextField!==field;
+    if(changedField)pages={blue:1,longtail:1,red:1};
+    const target={kind:options.kind||active,page:options.page||pages[options.kind||active],hide:options.hide??hideSaved};
+    const v=++request,g=context,startedAtRevision=saveRevision;field=nextField;active=target.kind;hideSaved=target.hide;loading=true;
+    retryTarget={field:nextField,...target};render();message('저장된 데이터에서 추천 후보를 찾고 있어요…');
     try {
-      const result=blogger?await client.rpc('keychallenge_blogger_keyword_opportunities'):await client.rpc('keychallenge_keyword_opportunities',{p_influencer_id:profile.influencerId,p_field:field});
+      const params={p_kind:target.kind,p_page:target.page,p_hide_saved:target.hide};
+      if(!blogger)Object.assign(params,{p_influencer_id:profile.influencerId,p_field:field});
+      const result=await client.rpc(blogger?'keychallenge_blogger_keyword_opportunities_page':'keychallenge_keyword_opportunities_page',params);
       if(g!==context||v!==request)return;
       if(result.error)throw result.error;
-      data=result.data;loadedAt=Date.now();
+      if(!result.data||result.data.kind!==target.kind||!Array.isArray(result.data[target.kind])||!result.data.counts||!result.data.total_counts)throw Error('추천 응답을 확인하지 못했습니다.');
+      data=result.data;pages[active]=data.page;loadedAt=Date.now();retryTarget=null;rows.clear();
       for(const [key,revision] of savedOverrides)if(revision<=startedAtRevision)savedOverrides.delete(key);
-      for(const [id] of kinds)for(const row of data[id])rows.set(row.keyword_id,row);
-      remember([...rows.values()]);message('');render();
+      for(const [id] of kinds)for(const row of data[id]||[])rows.set(row.keyword_id,row);
+      remember([...rows.values()]);message(options.notice||'');
     } catch(error) {
       if(g!==context||v!==request)return;
-      message('추천을 불러오지 못했습니다. 다시 불러오기를 눌러 주세요.',true);
-      $('opportunityCards').innerHTML='<div class="opportunity-empty"><button type="button" class="button button-light" data-opportunity-retry>다시 불러오기</button></div>';
+      data=old.data;active=old.active;field=old.field;hideSaved=old.hideSaved;pages=old.pages;
+      message((options.notice?'보관은 완료했지만 다음 후보를 불러오지 못했습니다. ':'추천을 불러오지 못했습니다. ')+(data?'이전 목록을 유지합니다. ':'')+'다시 불러오기를 눌러 주세요.',true);
     } finally {
-      if(g===context&&v===request){loading=false;$('opportunityPanel').setAttribute('aria-busy','false');if(pendingField!==null){const next=pendingField;pendingField=null;if(next!==field&&next!==data?.field)void load(next);}}
+      if(g===context&&v===request){
+        loading=false;render();
+        if(retryTarget){const button=document.createElement('button');button.type='button';button.className='button button-light';button.dataset.opportunityRetry='';button.textContent='다시 불러오기';$('opportunityStatus').append(' ',button);}
+        if(pendingField!==null){const next=pendingField;pendingField=null;if(next!==field&&next!==data?.field)void load(next);}
+      }
     }
   }
   function selectTab(id,focus=false) {
-    if(!kinds.some(([key])=>key===id))return;
-    active=id;render();if(!data)syncTabs();
+    if(loading||saving.size||!kinds.some(([key])=>key===id)||id===active)return;
+    void load(field,{kind:id,page:pages[id]});
     if(focus)$('opportunityTab-'+id).focus();
   }
   root.querySelector('[role="tablist"]').addEventListener('keydown',event=>{
@@ -91,11 +115,20 @@ export function createKeywordOpportunities(client, {remember=()=>{},onDetail,onS
   root.addEventListener('click',async event=>{
     const tab=event.target.closest('[data-opportunity-tab]');
     if(tab){selectTab(tab.dataset.opportunityTab);return;}
-    if(event.target.closest('[data-opportunity-retry]')){void load();return;}
+    if(event.target.closest('[data-opportunity-retry]')){const target=retryTarget;if(target)void load(target.field,target);return;}
+    const page=event.target.closest('[data-opportunity-page]');
+    if(page){
+      if(!page.disabled&&data){
+        const g=context,fromBottom=page.closest('nav')===root.querySelectorAll('.opportunity-pagination')[1];
+        await load(field,{page:data.page+Number(page.dataset.opportunityPage)});
+        if(g===context&&!retryTarget&&fromBottom){$('opportunityPanel').scrollIntoView({behavior:'smooth',block:'start'});$('opportunityPanel').focus({preventScroll:true});}
+      }
+      return;
+    }
     const detail=event.target.closest('[data-opportunity-detail]');
     if(detail){const row=rows.get(detail.dataset.opportunityDetail);if(row)onDetail(blogger?row.name:row.keyword_id);return;}
     const button=event.target.closest('[data-opportunity-save]');
-    if(!button||button.disabled||!user)return;
+    if(!button||button.disabled||!user||loading||saving.size)return;
     const row=rows.get(button.dataset.opportunitySave);if(!row||saving.has(row.keyword_key))return;
     const g=context;saving.add(row.keyword_key);render();message('');
     try {
@@ -104,19 +137,24 @@ export function createKeywordOpportunities(client, {remember=()=>{},onDetail,onS
       if(result.error)throw result.error;
       savedOverrides.set(row.keyword_key,++saveRevision);
       for(const item of rows.values())if(item.keyword_key===row.keyword_key)item.saved=true;
-      message(`‘${row.name}’ 키워드를 보관함에 담았습니다.`);
-      onSaved(row);
+      if(hideSaved){saving.delete(row.keyword_key);await load(field,{notice:`‘${row.name}’ 키워드를 보관함에 담고 남은 후보를 갱신했습니다.`});}
+      else message(`‘${row.name}’ 키워드를 보관함에 담았습니다.`);
+      if(g===context)onSaved(row);
     } catch(error) {
       if(g===context)message(error.message||'보관하지 못했습니다. 다시 시도해 주세요.',true);
     } finally {
       if(g===context){saving.delete(row.keyword_key);render();}
     }
   });
+  root.querySelector('[data-opportunity-hide-saved]').addEventListener('change',event=>{
+    if(loading||saving.size)return;
+    pages={blue:1,longtail:1,red:1};void load(field,{page:1,hide:event.target.checked});
+  });
   const mounted=mountKeywordRecommendations({root,personalRoot,mode,activate(tab){
     recommendationTab=tab;visible=tab==='personal'||tab==='opportunity';
     if(!user||!profile)return;
     if(tab==='personal')void personal.load(false);
-    if(tab==='opportunity'&&!loading&&(!data||Date.now()-loadedAt>60000))void load('__mine__');
+    if(tab==='opportunity'&&!loading&&(!data||Date.now()-loadedAt>60000))void load(field);
   }});
   return {
     load,
@@ -126,9 +164,9 @@ export function createKeywordOpportunities(client, {remember=()=>{},onDetail,onS
       user=nextUser;profile=nextProfile;
       if(key===contextKey)return;
       contextKey=key;personal.setContext(user,profile);
-      context++;request++;data=null;loading=false;pendingField=null;active='blue';field='__mine__';
+      context++;request++;data=null;loading=false;pendingField=null;active='blue';field='__mine__';hideSaved=true;retryTarget=null;pages={blue:1,longtail:1,red:1};
       rows.clear();saving.clear();savedOverrides.clear();
-      $('opportunityCards').innerHTML='';$('opportunitySummary').textContent='';message('');syncTabs();mounted.refresh();
+      $('opportunityCards').innerHTML='';$('opportunitySummary').textContent='';message('');render();mounted.refresh();
     }
   };
 }

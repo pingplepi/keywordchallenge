@@ -70,3 +70,16 @@
   .personal-recommendation-actions { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); width:100%; margin-top:12px; }
   .personal-recommendation-actions .button { min-width:0; padding-inline:10px; }
 }
+
+/* Browse every recommendation without making the card grid longer. */
+.opportunity-browse-controls { margin:20px 0; }
+.opportunity-saved-filter { display:inline-flex; align-items:center; gap:8px; cursor:pointer; font-weight:700; }
+.opportunity-saved-filter input { width:18px; height:18px; margin:0; accent-color:var(--primary,#7255df); }
+.opportunity-browse-controls p { margin:8px 0 0; }
+.opportunity-pagination { display:flex; align-items:center; justify-content:center; gap:16px; margin:20px 0; }
+.opportunity-pagination span { min-width:110px; text-align:center; color:var(--muted,#77738a); font-variant-numeric:tabular-nums; }
+.opportunity-status .button { margin-left:8px; }
+@media(max-width:640px) {
+  .opportunity-pagination { gap:8px; }
+  .opportunity-pagination .button { min-width:68px; }
+}
