@@ -1,4 +1,5 @@
 import { createKeywordOpportunities } from './keyword-opportunities.js';
+import { DASHBOARD_FIELDS, defaultDashboardField } from './interest-fields.js';
 
 const $ = id => document.getElementById(id);
 const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -10,14 +11,14 @@ const empty = message => `<div class="strategy-empty">${esc(message)}</div>`;
 const table = (head, body) => `<div class="table-wrap"><table class="tbl strategy-table"><thead><tr>${head.map(v=>`<th>${v}</th>`).join('')}</tr></thead><tbody>${body}</tbody></table></div>`;
 const delta = row => row.gain > 0 ? `<span class="change-up">▲ ${num(row.gain)}</span>` : row.gain < 0 ? `<span class="change-down">▼ ${num(-row.gain)}</span>` : row.current_rank && !row.previous_rank ? '<span class="change-up">순위 진입</span>' : !row.current_rank && row.previous_rank ? '<span class="change-down">순위 미확인</span>' : '유지';
 
-export function createStrategy(client) {
-  let user = null, profile = null, data = null, fields = [], version = 0, contextVersion = 0, detailVersion = 0, searchVersion = 0, page = 1, mover = 'up', timer;
+export function createStrategy(client, {getInterest=()=>null}={}) {
+  let user = null, profile = null, data = null, preferredField = '', version = 0, contextVersion = 0, detailVersion = 0, searchVersion = 0, page = 1, mover = 'up', timer;
   const records = new Map();
   $('strategyView').innerHTML = `
     <div class="strategy-heading"><div><p class="eyebrow">YOUR DAILY KEYWORD BRIEF</p><h1>키온 대시보드</h1><p id="strategySubtitle" class="muted">오늘 집중할 키워드를 한눈에 확인하세요.</p></div><a id="strategyManageLink" class="button button-light" href="#accountView" hidden>내 설정 관리 ↗</a></div>
     <div id="strategyEmpty" class="panel strategy-welcome" aria-live="polite" aria-busy="true"><h2 id="strategyWelcomeTitle">연결 정보를 불러오고 있어요.</h2><p id="strategyWelcomeDescription" class="muted">잠시만 기다려 주세요.</p><a id="strategyConnect" class="button" href="#accountView" hidden>인플홈 연결하기</a><button id="strategyRetry" class="button" hidden>다시 불러오기</button><p id="strategyWelcomeNote" class="muted small" hidden>처음 한 번 연결하면 다음 로그인부터 내 대시보드가 바로 열립니다.</p></div>
     <div id="strategyContent" hidden>
-      <div class="strategy-context"><div><span id="strategyProfile" class="profile-chip"></span><span id="strategyDate" class="muted small"></span></div><div class="strategy-controls"><label>분야<select id="strategyField"><option value="__mine__">내 주요 분야</option><option value="">모든 분야</option></select></label><button id="strategyRefresh" class="button button-quiet">새로고침</button></div></div>
+      <div class="strategy-context"><div><span id="strategyProfile" class="profile-chip"></span><span id="strategyDate" class="muted small"></span></div><div class="strategy-controls"><label>분야<select id="strategyField"><option value="">모든 분야</option></select></label><button id="strategyRefresh" class="button button-quiet">새로고침</button></div></div>
       <p id="strategyError" class="message error" role="status" hidden></p>
       <div class="strategy-stats">
         <button class="panel metric" data-filter="all"><span>전체 키챌</span><strong id="metricMarket">—</strong><small id="metricMarketNote">선택한 분야 기준</small></button>
@@ -138,7 +139,9 @@ export function createStrategy(client) {
   $('detailPrev').addEventListener('click',()=>{if(page>1){page--;void search();}});$('detailNext').addEventListener('click',()=>{page++;void search();});
   return {refresh,show:page=>opportunities.show(page),async setContext(nextUser,nextProfile,{loading=false,loadError=false}={}){
     const context=++contextVersion;
-    const changed=profile?.influencerId!==nextProfile?.influencerId||user?.id!==nextUser?.id;
+    const nextPreferredField=defaultDashboardField(getInterest());
+    const changed=profile?.influencerId!==nextProfile?.influencerId||user?.id!==nextUser?.id||preferredField!==nextPreferredField;
+    preferredField=nextPreferredField;
     user=nextUser;profile=nextProfile;version++;searchVersion++;detailVersion++;
     opportunities.setContext(user,profile);
     $('strategyView').hidden=false;$('strategyEmpty').hidden=!!profile;$('strategyContent').hidden=!profile;
@@ -157,8 +160,12 @@ export function createStrategy(client) {
       return;
     }
     $('strategyProfile').textContent=profile.influencerId;$('strategySubtitle').textContent='참여 현황부터 다음 공략까지, 매일 쌓이는 내 키워드 기록.';
-    if(!fields.length){const {data:info,error}=await client.rpc('keychallenge_catalog_info');if(context!==contextVersion)return;if(!error)fields=info.fields||[];}
-    if(changed||$('strategyField').options.length===2){const options=fields.map(f=>`<option value="${esc(f.field)}">${esc(f.field)}</option>`).join('');$('strategyField').innerHTML='<option value="__mine__">내 주요 분야</option><option value="">모든 분야</option>'+options;$('detailField').innerHTML='<option value="">모든 분야</option>'+options;records.clear();}
+    if(context!==contextVersion)return;
+    if(changed||$('strategyField').options.length===1){
+      const options=DASHBOARD_FIELDS.map(f=>`<option value="${esc(f.value)}">${esc(f.label||f.value)}</option>`).join('');
+      $('strategyField').innerHTML=options;$('detailField').innerHTML=options;
+      $('strategyField').value=preferredField;$('detailField').value=preferredField;records.clear();
+    }
     await refresh();
   }};
 }

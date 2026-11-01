@@ -27,3 +27,10 @@ export function normalizeInterestField(value) {
   // Keep the previous selection when members open settings created before the full list.
   return value === '문화/예술' ? '공연/전시/예술' : value || '';
 }
+
+export const DASHBOARD_FIELDS = [{ value: '', label: '모든 분야' }, ...INTEREST_FIELDS];
+
+export function defaultDashboardField(interest) {
+  const value = normalizeInterestField(interest);
+  return INTEREST_FIELDS.some(field => field.value === value) ? value : '';
+}

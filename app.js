@@ -468,12 +468,16 @@ async function initialize() {
     auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true },
   });
   catalog = createCatalog(supabase);
-  strategy = createStrategy(supabase);
+  strategy = createStrategy(supabase, {getInterest:()=>member?.interest});
   membership = createMembershipManager(supabase);
   blogAnalysis = createBlogAnalysis(supabase);
   collaboration = createCollaborationManager(supabase);
   workspace = createBloggerWorkspace(supabase, { onMemberChange(next, ready = true) {
-    member = next; memberReady = ready; showPage();
+    member = next; memberReady = ready;
+    if(ready && member?.mode==='influencer' && profiles.has(activeId)) {
+      void strategy?.setContext(session?.user || null, profiles.get(activeId));
+    }
+    showPage();
   } });
   // Keep the collector's existing controls and listeners inside account settings.
   byId('accountView').append(byId('appView'));

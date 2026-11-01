@@ -1,4 +1,5 @@
 import { createKeywordOpportunities } from './keyword-opportunities.js';
+import { DASHBOARD_FIELDS, defaultDashboardField } from './interest-fields.js';
 const $ = id => document.getElementById(id);
 const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const count = value => Number(value || 0).toLocaleString('ko-KR');
@@ -12,11 +13,11 @@ export function createBloggerDashboard(client, {notify, onSearch}) {
   let data = null, visible = false, loading = false, loadedAt = 0, reloadAfter = false;
   let refreshTimer=null,polling=false,pollAttempts=0,readVersion=0;
   let attackRanking=null,attackRankingLoading=false,attackRankingRequest=0;
-  let field='__mine__',fields=[],fieldsRequest=null;
+  let field='';
   const saving = new Set();
 
   root.innerHTML = `<div class="strategy-heading"><div><p class="eyebrow">YOUR NEXT STORY</p><h1>키온 대시보드</h1><p class="muted">오늘 쓸 글감을 고르고, 내 경험과 관점으로 풀어보세요.</p></div><a class="button button-light" href="#accountView">내 설정 관리 ↗</a></div>
-    <div class="strategy-context"><div><span id="discoveryProfile" class="profile-chip"></span><span id="discoveryBaseline" class="muted small"></span></div><div class="strategy-controls"><label>분야<select id="discoveryField"><option value="__mine__">내 관심 분야</option><option value="">모든 분야</option></select></label><button type="button" class="button button-quiet" data-discovery-action="refresh">새로고침</button></div></div>
+    <div class="strategy-context"><div><span id="discoveryProfile" class="profile-chip"></span><span id="discoveryBaseline" class="muted small"></span></div><div class="strategy-controls"><label>분야<select id="discoveryField"><option value="">모든 분야</option></select></label><button type="button" class="button button-quiet" data-discovery-action="refresh">새로고침</button></div></div>
     <div id="discoveryStatus" class="message" role="status"></div><div id="discoveryOverview"></div><section id="bloggerOpportunities" class="panel work-panel"></section><div id="discoveryBody"></div>`;
 
   const opportunities=createKeywordOpportunities(client,{
@@ -25,15 +26,8 @@ export function createBloggerDashboard(client, {notify, onSearch}) {
   });
 
   function renderFields() {
-    $('discoveryField').innerHTML='<option value="__mine__">내 관심 분야</option><option value="">모든 분야</option>'+fields.map(item=>`<option value="${esc(item.field)}">${esc(item.field)}</option>`).join('');
+    $('discoveryField').innerHTML=DASHBOARD_FIELDS.map(item=>`<option value="${esc(item.value)}">${esc(item.label||item.value)}</option>`).join('');
     $('discoveryField').value=field;
-  }
-  async function loadFields() {
-    if(fields.length)return;
-    if(!fieldsRequest)fieldsRequest=client.rpc('keychallenge_catalog_info');
-    try{const result=await fieldsRequest;if(!result.error){fields=result.data?.fields||[];renderFields();}}
-    catch{/* Keep the current options and retry on the next refresh. */}
-    finally{fieldsRequest=null;}
   }
   function idea(row) {
     const reasons = [row.saved ? '보관한 관심 키워드' : '선택 분야 검색량 상위', data.post_count ? '수집된 글 제목에 없음' : '글 수집 전 · 작성 여부 미비교'];
@@ -76,7 +70,7 @@ function scheduleVolumePoll(){stopVolumePoll();if(!visible||document.hidden||!da
     $('discoveryProfile').textContent=data.blog_id||settings?.blog_id||'블로그 연결 전';
     $('discoveryBaseline').textContent=baseline;
     $('discoveryOverview').innerHTML = `
-      ${field==='__mine__' && (!data.interest || data.interest==='기타') ? '<div class="analysis-note">위에서 분야를 선택하면 분야별 추천을 볼 수 있습니다. 기본 관심 분야는 내 설정에서 지정할 수 있습니다. <a href="#accountView">분야 선택하기 ↗</a></div>' : ''}
+      ${(!settings?.interest || settings.interest==='기타') && (!field || field==='기타') ? '<div class="analysis-note">위에서 분야를 선택하면 분야별 추천을 볼 수 있습니다. 기본 관심 분야는 내 설정에서 지정할 수 있습니다. <a href="#accountView">분야 선택하기 ↗</a></div>' : ''}
       <div class="strategy-stats work-stats discovery-stats">
         ${metric('보관 중인 글감',data.saved_count,'내가 저장한 키워드','#savedKeywordsView')}
         ${metric('새 글감 후보',data.opportunity_count,data.post_count?'추천 후보 중 글 제목에 없는 키워드':'글 수집 전 · 작성 여부 비교 전','discoveryRanking','metric-purple')}
@@ -87,14 +81,13 @@ function scheduleVolumePoll(){stopVolumePoll();if(!visible||document.hidden||!da
       <section id="discoveryIdeas" class="panel work-panel"><div class="work-section-title"><div><p class="eyebrow">TODAY’S KEYWORDS</p><h2>오늘의 추천 키워드 <span class="count-chip">${count(data.ideas.length)}개</span></h2></div><a href="#keywordSearchView">다른 키워드 찾기 ↗</a></div><p class="muted discovery-description">선택한 분야와 보관한 키워드에서 고른 오늘의 추천 키워드입니다. 검색량 조회 일자와 추천 이유를 함께 확인하세요.</p>${data.ideas.length?`<div class="table-wrap discovery-ideas-table" tabindex="0" role="region" aria-label="오늘의 추천 키워드 표"><table class="tbl strategy-table"><thead><tr>${['키워드','분야','월 검색량','조회 일자','추천 이유'].map(label=>`<th scope="col">${label}</th>`).join('')}</tr></thead><tbody>${data.ideas.map(idea).join('')}</tbody></table></div><p class="catalog-footnote">조회 일자는 네이버 월 검색량을 수집한 날짜입니다.</p>`:empty('아직 추천할 키워드가 없습니다. 관심 분야를 선택하거나 키워드 검색에서 관심 키워드를 보관해 주세요.')}</section>
 
       <section id="discoveryTopKeywords" class="panel work-panel">${topKeywordsContent()}</section>
-      <details class="discovery-method"><summary>추천 기준과 데이터 범위</summary><p>선택한 분야의 검색량 높은 키워드 최대 300개와 내 보관함을 후보로 사용합니다. 특정 분야를 선택하면 보관 글감도 해당 분야로 확인된 키워드만 포함합니다. ‘내 관심 분야’에서는 기존 관심 분야와 보관 글감을 함께 추천합니다. 수집된 글 제목에 키워드가 포함되어 있으면 추천에서 제외합니다. 공백과 영문 대소문자를 정리한 단순 제목 비교이며, 글 본문이나 블로그 전체 이력을 분석한 결과는 아닙니다.</p><p>오늘의 추천은 후보 중 상위 30개에서 한국시간 날짜별로 최대 10개를 고릅니다. 후보가 적으면 확보된 개수만 표시합니다. 오늘의 추천 키워드는 순위 없이 표시하며 월 검색량순은 아닙니다. 보관 키워드를 우선 후보에 넣으며, 검색량은 최근 30일 안에 조회한 네이버 검색광고 PC·모바일 합계입니다. 검색량을 확인하지 않은 보관 글감은 ‘미확인’으로 표시합니다.</p><p>접속하거나 대시보드를 열면 오늘 확인하지 않은 추천 후보의 검색량을 우선 갱신합니다. 오늘 수집한 검색량은 회원들이 함께 재사용하며, 갱신이 끝나면 TOP 10에 자동으로 반영됩니다. 매일 오전 4시 15분부터 분야별 검색량 상위 후보도 순차 갱신합니다. 검색량은 네이버가 제공하는 월 단위 수치입니다. 검색 노출 점검 횟수는 차감되지 않습니다.</p></details>`;
+      <details class="discovery-method"><summary>추천 기준과 데이터 범위</summary><p>선택한 분야의 검색량 높은 키워드 최대 300개와 내 보관함을 후보로 사용합니다. 특정 분야를 선택하면 보관 글감도 해당 분야로 확인된 키워드만 포함합니다. 기본 분야는 내 설정의 ‘주로 다루는 분야’를 따르며, 이 화면에서 바꾼 분야는 저장된 설정에 영향을 주지 않습니다. 수집된 글 제목에 키워드가 포함되어 있으면 추천에서 제외합니다. 공백과 영문 대소문자를 정리한 단순 제목 비교이며, 글 본문이나 블로그 전체 이력을 분석한 결과는 아닙니다.</p><p>오늘의 추천은 후보 중 상위 30개에서 한국시간 날짜별로 최대 10개를 고릅니다. 후보가 적으면 확보된 개수만 표시합니다. 오늘의 추천 키워드는 순위 없이 표시하며 월 검색량순은 아닙니다. 보관 키워드를 우선 후보에 넣으며, 검색량은 최근 30일 안에 조회한 네이버 검색광고 PC·모바일 합계입니다. 검색량을 확인하지 않은 보관 글감은 ‘미확인’으로 표시합니다.</p><p>접속하거나 대시보드를 열면 오늘 확인하지 않은 추천 후보의 검색량을 우선 갱신합니다. 오늘 수집한 검색량은 회원들이 함께 재사용하며, 갱신이 끝나면 TOP 10에 자동으로 반영됩니다. 매일 오전 4시 15분부터 분야별 검색량 상위 후보도 순차 갱신합니다. 검색량은 네이버가 제공하는 월 단위 수치입니다. 검색 노출 점검 횟수는 차감되지 않습니다.</p></details>`;
   }
   async function load(refreshOpportunities=true) {
     if (!user || settings?.mode !== 'blogger') return;
     if (loading) { reloadAfter = true; return; }
     const g = generation, version=++readVersion;
     stopVolumePoll();pollAttempts=0;
-    void loadFields();
     if(refreshOpportunities)void opportunities.load();
     loading = true; reloadAfter = false;
     root.querySelector('[data-discovery-action="refresh"]').disabled = true;
@@ -159,7 +152,7 @@ function scheduleVolumePoll(){stopVolumePoll();if(!visible||document.hidden||!da
       if (key === contextKey) return;
       contextKey = key; generation++; attackRankingRequest++; attackRanking=null; attackRankingLoading=false; readVersion++; stopVolumePoll();polling=false;pollAttempts=0;data = null; loadedAt = 0; loading = false; reloadAfter = false; saving.clear();
       $('discoveryOverview').innerHTML = ''; $('discoveryBody').innerHTML = ''; $('discoveryStatus').textContent = '';
-      field='__mine__';renderFields();
+      field=defaultDashboardField(settings?.interest);renderFields();
       $('discoveryProfile').textContent=settings?.blog_id||'블로그 연결 전';$('discoveryBaseline').textContent='';
       root.querySelector('[data-discovery-action="refresh"]').disabled = false;
     },
