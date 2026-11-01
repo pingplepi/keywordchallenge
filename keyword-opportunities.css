@@ -60,3 +60,13 @@
   .discovery-search-tabs [role="tab"] { font-size:var(--font-label); min-height:44px; }
   .keyword-explore-shortcut .button { width:100%; justify-content:center; }
 }
+
+/* Personal recommendation history uses the same action sizes on every screen. */
+.personal-keywords .section-heading { flex-wrap:wrap; }
+.personal-recommendation-actions { display:flex; align-items:center; gap:var(--action-gap,8px); flex-shrink:0; }
+.personal-recommendation-actions .button { white-space:nowrap; }
+.personal-recommendation-actions [data-personal-previous]:disabled { cursor:default; }
+@media(max-width:640px) {
+  .personal-recommendation-actions { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); width:100%; margin-top:12px; }
+  .personal-recommendation-actions .button { min-width:0; padding-inline:10px; }
+}

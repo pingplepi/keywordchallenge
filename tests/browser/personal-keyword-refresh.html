@@ -1,6 +1,6 @@
 <!doctype html>
-<html lang="ko"><meta charset="utf-8"><title>맞춤 추천 순환 검증</title>
-<link rel="stylesheet" href="../../styles.css"><link rel="stylesheet" href="../../keyword-opportunities.css">
+<html lang="ko"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>맞춤 추천 순환 검증</title>
+<link rel="stylesheet" href="../../styles.css"><link rel="stylesheet" href="../../keyword-opportunities.css"><link rel="stylesheet" href="../../ui-system.css">
 <main style="max-width:1000px;margin:24px auto"><h1>맞춤 추천 순환 검증</h1><p>저장소 루트에서 로컬 HTTP 서버로 열어 실행합니다. 외부 API나 실제 회원 데이터를 사용하지 않습니다.</p><button id="run" class="button">검증 시작</button><ol id="checks"></ol><section id="personal" class="panel"></section></main>
 <script type="module">
 import {createPersonalKeywords} from '../../keyword-discovery.js';
@@ -44,7 +44,39 @@ document.querySelector('#run').onclick=async()=>{
   queue=[{error:{code:'57014'}}];const logoutStart=calls.length;const abandoned=component.load(true);await pause(0);component.setContext(null,null);await abandoned;
   assert(calls.length===logoutStart+1&&!select('[data-personal-cards]').textContent&&!status(),'logout retry');pass('재시도 대기 중 로그아웃하면 재조회 중단');
   assert(calls.every(c=>c.name==='keychallenge_personalized_keyword_batch'),'unexpected external API');pass('맞춤 추천 조회만 호출 · 검색 API 추가 사용 없음');
-  document.title='11개 검증 통과';
+  component.setContext({id:'history-test'},{influencerId:'example'});
+  const previous=()=>select('[data-personal-previous]');
+  assert(previous().disabled,'previous enabled without history');
+  queue=[response(['서울계곡','다낭카페'])];await component.load(false);
+  queue=[{data:{}}];select('[data-personal-save="서울계곡"]').click();await pause(0);
+  const firstCards=select('[data-personal-cards]').innerHTML,firstTime=select('[data-personal-updated]').textContent;
+  clock+=61000;queue=[response(['서울숲','푸꾸옥여행'])];await component.load(true);
+  const secondCards=select('[data-personal-cards]').innerHTML,secondTime=select('[data-personal-updated]').textContent;
+  let finishThird;queue=[()=>new Promise(resolve=>finishThird=resolve)];const thirdPending=component.load(true);
+  assert(previous().disabled,'previous enabled during request');previous().click();
+  assert(select('[data-personal-cards]').innerHTML===secondCards,'previous changed pending request');
+  finishThird(response(['제주숲길','치앙마이카페']));await thirdPending;pass('첫 추천과 조회 중에는 이전 추천 비활성화');
+  const historyCalls=calls.length;previous().click();
+  assert(select('[data-personal-cards]').innerHTML===secondCards&&select('[data-personal-updated]').textContent===secondTime&&calls.length===historyCalls,'second snapshot not restored exactly');
+  clock+=61000;await component.load(false);
+  assert(calls.length===historyCalls&&select('[data-personal-cards]').innerHTML===secondCards,'tab reload replaced historical snapshot');pass('이전 목록·추천 이유·검색량·확인 시각 그대로 복원 · 탭 재진입 유지');
+  previous().click();
+  assert(select('[data-personal-cards]').innerHTML===firstCards&&select('[data-personal-updated]').textContent===firstTime&&previous().disabled&&calls.length===historyCalls,'first snapshot or saved flag lost');pass('여러 단계 되돌아가기 · 보관 상태 유지 · 추가 조회 없음');
+  queue=[response(['부산산책','발리여행'])];await component.load(true);
+  assert(equal(calls.at(-1).args.p_current_keyword_keys,['서울계곡','다낭카페'])&&calls.at(-1).args.p_seen_keyword_keys.includes('제주숲길'),'refresh after previous lost seen history');pass('이전 목록에서 새로고침해도 최근 본 키워드 제외 기록 유지');
+  queue=[{error:{message:'permission denied'}}];await component.load(true);
+  queue=[response(['부산산책','발리여행'],0,0)];await component.load(true);
+  previous().click();assert(select('[data-personal-cards]').innerHTML===firstCards&&previous().disabled,'failure or unchanged batch polluted history');pass('실패하거나 같은 목록이 오면 이전 이력에 중복 추가하지 않음');
+  queue=[response(['국내여행','세계여행'])];await component.load(true);
+  const differentField=response(['향수','립스틱']);differentField.data.field='뷰티';queue=[differentField];await component.load(true);
+  assert(previous().disabled,'field change leaked previous field');pass('분야가 바뀌면 이전 분야의 추천 이력 초기화');
+  queue=[response(['제주여행','나트랑카페'])];await component.load(true);
+  queue=[response(['서울산책','베트남카페'])];await component.load(true);assert(!previous().disabled,'missing reset setup history');
+  component.setContext({id:'another-member'},{blog_id:'another',mode:'blogger'});
+  assert(previous().disabled&&!select('[data-personal-cards]').textContent,'new member saw old history');pass('다른 계정으로 전환하면 이전 추천과 이력 모두 초기화');
+  queue=[response(['제주여행','나트랑카페'])];await component.load(false);
+  queue=[response(['서울산책','베트남카페'])];await component.load(true);
+  document.title=list.children.length+'개 검증 통과';
  }catch(error){const li=document.createElement('li');li.textContent='FAIL · '+error.message;list.append(li);document.title='검증 실패';}
  finally{Date.now=realNow;}
 };

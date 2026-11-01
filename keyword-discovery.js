@@ -90,12 +90,24 @@ export function createTopicDiscovery(client,{root,onSaved=()=>{}}){
   return {direct:()=>choose('direct'),show(page){visible=page==='keywordSearchView';sync();},setContext(next,nextSettings){epoch++;sequence++;controller?.abort();user=next;settings=nextSettings;all=[];titles=[];postCount=0;saved.clear();$('[data-topic-result]').hidden=true;$('[data-topic-submit]').disabled=false;$('[data-topic-status]').textContent='주제를 선택한 뒤 버튼을 눌러 주세요.';$('[data-topic-field]').value=Object.hasOwn(topics,normalizeInterestField(settings?.interest))?normalizeInterestField(settings.interest):'여행';seeds();choose('personal');}};
 }
 export function createPersonalKeywords(client,{root,onSaved=()=>{}}){
-  let user=null,profile=null,epoch=0,request=0,data=null,loading=false,loadedAt=0,seenKeys=[];const saved=new Set();
-  root.className='personal-keywords';root.innerHTML='<div class="section-heading"><div><p class="eyebrow">PERSONAL KEYWORDS</p><h2>나에게 맞는 키워드</h2><p class="muted">성과 기록과 최근 글의 주제를 바탕으로 다음 글감을 찾아보세요.</p></div><button class="button button-light" data-personal-refresh>추천 새로고침</button></div><p class="muted small">새로고침하면 내 분야와 글에 맞는 다른 키워드를 추천합니다. 최근에 본 후보는 뒤로 보내고, 새 후보가 부족하면 일부를 다시 보여드립니다.</p><p class="message" role="status" data-personal-status></p><p class="muted small" data-personal-updated hidden></p><div data-personal-basis></div><div class="opportunity-grid" data-personal-cards></div><details class="score-note opportunity-method"><summary>맞춤 추천 기준과 데이터 범위</summary><p>최근 30일 안의 인플홈 수집과 최대 7개 날짜의 순위 기록에서 TOP10 키챌을 찾습니다. 이는 키워드 챌린지 순위이며 블로그 통합검색 순위가 아닙니다.</p><p>해당 키챌에 등록한 글과 최근 수집한 글 최대 50편의 제목에서 반복되는 표현을 비교합니다. 블로그의 노출 확인은 글 제목 검색 결과로, 특정 키워드의 상위 노출을 뜻하지 않습니다.</p><p>관심 분야의 최근 30일 검색량이 있는 키챌 목록에서 관련 후보를 찾고, 수집한 글 제목과 참여 목록에 이미 있는 키워드는 제외합니다. 연결 표현·확인 기록·키챌 참여자 대비 수요를 참고한 확장 추천이며, 노출 가능성을 보장하거나 점수로 예측하지 않습니다. 본문과 과거 전체 글을 비교한 결과는 아닙니다.</p><p>이 화면에서 최근에 본 후보보다 아직 보지 않은 후보를 우선합니다. 새 후보를 모두 확인하면 오래전에 본 후보부터 다시 추천하며, 탭을 옮겼다 돌아와도 현재 추천을 유지합니다.</p><p>저장된 데이터만 사용하므로 검색 노출 점검 횟수를 차감하거나 검색광고 API를 새로 호출하지 않습니다.</p></details>';
+  let user=null,profile=null,epoch=0,request=0,data=null,loading=false,loadedAt=0,seenKeys=[],previousBatches=[],viewingPrevious=false;const saved=new Set();
+  root.className='personal-keywords';root.innerHTML='<div class="section-heading"><div><p class="eyebrow">PERSONAL KEYWORDS</p><h2>나에게 맞는 키워드</h2><p class="muted">성과 기록과 최근 글의 주제를 바탕으로 다음 글감을 찾아보세요.</p></div><div class="personal-recommendation-actions"><button type="button" class="button button-quiet" data-personal-previous disabled>이전 추천</button><button type="button" class="button button-light" data-personal-refresh>추천 새로고침</button></div></div><p class="muted small">새로고침하면 내 분야와 글에 맞는 다른 키워드를 추천합니다. 최근에 본 후보는 뒤로 보내고, 새 후보가 부족하면 일부를 다시 보여드립니다.</p><p class="message" role="status" data-personal-status></p><p class="muted small" data-personal-updated hidden></p><div data-personal-basis></div><div class="opportunity-grid" data-personal-cards></div><details class="score-note opportunity-method"><summary>맞춤 추천 기준과 데이터 범위</summary><p>최근 30일 안의 인플홈 수집과 최대 7개 날짜의 순위 기록에서 TOP10 키챌을 찾습니다. 이는 키워드 챌린지 순위이며 블로그 통합검색 순위가 아닙니다.</p><p>해당 키챌에 등록한 글과 최근 수집한 글 최대 50편의 제목에서 반복되는 표현을 비교합니다. 블로그의 노출 확인은 글 제목 검색 결과로, 특정 키워드의 상위 노출을 뜻하지 않습니다.</p><p>관심 분야의 최근 30일 검색량이 있는 키챌 목록에서 관련 후보를 찾고, 수집한 글 제목과 참여 목록에 이미 있는 키워드는 제외합니다. 연결 표현·확인 기록·키챌 참여자 대비 수요를 참고한 확장 추천이며, 노출 가능성을 보장하거나 점수로 예측하지 않습니다. 본문과 과거 전체 글을 비교한 결과는 아닙니다.</p><p>이 화면에서 최근에 본 후보보다 아직 보지 않은 후보를 우선합니다. 새 후보를 모두 확인하면 오래전에 본 후보부터 다시 추천하며, 탭을 옮겼다 돌아와도 현재 추천을 유지합니다.</p><p>‘이전 추천’으로 최근 50회 추천 목록을 순서대로 다시 볼 수 있습니다. 당시의 검색량과 추천 근거를 보여주며, 이력은 페이지를 새로고침하거나 로그아웃하면 초기화됩니다.</p><p>저장된 데이터만 사용하므로 검색 노출 점검 횟수를 차감하거나 검색광고 API를 새로 호출하지 않습니다.</p></details>';
   const $=s=>root.querySelector(s);
   function render(){if(!data)return;
     $('[data-personal-basis]').innerHTML='<p class="opportunity-summary">'+esc(data.field||'관심 분야 미설정')+' · 최근 글 '+num(data.post_count)+'편 · 연결 후보 '+num(data.candidate_count)+'개</p>'+(data.strengths.length?'<div class="personal-evidence"><h3>좋은 순위가 확인된 키챌</h3><p class="muted small">'+(data.history_days?date(data.history_start)+'~'+date(data.history_end)+' · '+num(data.history_days)+'개 날짜 기록과 최근 수집 비교':'최근 인플홈 수집 기준')+' · 키챌 순위</p><ul>'+data.strengths.map(s=>'<li><strong>'+esc(s.keyword)+'</strong><span>기간 내 최고 '+num(s.best_rank)+'위 · 최근 '+(s.current_rank?num(s.current_rank)+'위':'미확인')+'</span></li>').join('')+'</ul></div>':'<p class="analysis-note">최근 키챌 TOP10 기록이 없어, 최근 글의 주제와 제목 검색 노출 확인 기록으로 추천합니다.</p>')+(data.exposed_posts?'<p class="muted small">최근 제목 검색으로 노출 확인된 글 '+num(data.exposed_posts)+'편을 참고했습니다.</p>':'');
     $('[data-personal-cards]').innerHTML=data.items.length?data.items.map(r=>'<article class="opportunity-card"><span class="count-chip">'+esc(r.travel_scope||r.field)+'</span><h3>'+esc(r.keyword)+'</h3><dl class="opportunity-metrics"><div><dt>월 검색량</dt><dd>'+range(r.volume_min,r.volume_max)+'</dd></div><div><dt>키챌 참여자</dt><dd>'+(r.participant_count==null?'미확인':num(r.participant_count))+'</dd></div></dl><ul class="opportunity-reasons">'+r.reasons.map(x=>'<li>'+esc(x)+'</li>').join('')+'</ul><div class="opportunity-card-footer"><small class="muted">'+date(r.collected_at)+' 검색량 기준</small><button class="button button-light" data-personal-save="'+esc(r.keyword_key)+'" '+(r.saved||saved.has(r.keyword_key)?'disabled':'')+'>'+(r.saved||saved.has(r.keyword_key)?'보관됨 ✓':'보관함 담기')+'</button></div></article>').join(''):'<div class="work-empty">'+(!data.field?'내 설정에서 관심 분야를 선택해 주세요.':!data.post_count&&!data.strengths.length?'블로그 글이나 인플홈 순위가 수집되면 맞춤 후보를 보여드립니다.':'현재 기록과 연결되는 새 후보가 아직 충분하지 않습니다. 주제별 추천에서 다른 글감을 찾아보세요.')+' <a href="#keywordSearchView" data-keyword-discovery-target="topic">주제별 추천 보기 ↗</a></div>';
+  }
+  function showCheckedTime(){
+    const updated=$('[data-personal-updated]');
+    updated.hidden=!data;
+    updated.textContent=data?'추천 확인: '+new Date(loadedAt).toLocaleString('ko-KR',{timeZone:'Asia/Seoul',month:'long',day:'numeric',hour:'numeric',minute:'2-digit',second:'2-digit'})+' · 한국시간':'';
+  }
+  function showPrevious(){
+    if(loading||!previousBatches.length)return;
+    const previous=previousBatches.pop();
+    data=previous.data;loadedAt=previous.loadedAt;viewingPrevious=true;
+    render();showCheckedTime();busy(false);
+    status('이전에 확인한 추천을 다시 보여드립니다. 당시의 검색량과 추천 근거를 표시합니다.');
   }
   const isTemporaryError=(error,status)=>error?.code==='57014'||error?.code==='PGRST003'||[502,503,504].includes(status)||/statement timeout|failed to fetch|networkerror|load failed/i.test(error?.message||'');
   function status(text,error=false){
@@ -105,11 +117,12 @@ export function createPersonalKeywords(client,{root,onSaved=()=>{}}){
   function busy(value){
     loading=value;
     $('[data-personal-refresh]').disabled=value;
+    $('[data-personal-previous]').disabled=value||!previousBatches.length;
     $('[data-personal-refresh]').textContent=value?'추천 확인 중…':'추천 새로고침';
     $('[data-personal-cards]').setAttribute('aria-busy',String(value));
   }
   async function load(force=true){
-    if(!user||!profile||loading||(!force&&data&&Date.now()-loadedAt<60000))return;
+    if(!user||!profile||loading||(!force&&data&&(viewingPrevious||Date.now()-loadedAt<60000)))return;
     const g=epoch,v=++request,rotating=force&&!!data;
     const params={p_influencer_id:profile.influencerId||null,p_field:'__mine__',
       p_seen_keyword_keys:seenKeys.slice(),p_current_keyword_keys:data?.items.map(r=>r.keyword_key)||[],p_rotate:rotating};
@@ -129,15 +142,19 @@ export function createPersonalKeywords(client,{root,onSaved=()=>{}}){
         if(!current())return;
       }
       if(!result.data||!Array.isArray(result.data.items)||!Array.isArray(result.data.strengths))throw new Error('추천 응답을 확인하지 못했습니다.');
-      if(data&&data.field!==result.data.field)seenKeys=[];
-      data=result.data;loadedAt=Date.now();
+      const fieldChanged=data&&data.field!==result.data.field;
+      const changedBatch=data&&JSON.stringify(data.items.map(r=>r.keyword_key))!==JSON.stringify(result.data.items.map(r=>r.keyword_key));
+      if(fieldChanged){seenKeys=[];previousBatches=[];}
+      else if(rotating&&changedBatch&&data.items.length){
+        previousBatches.push({data,loadedAt});
+        previousBatches=previousBatches.slice(-50);
+      }
+      data=result.data;loadedAt=Date.now();viewingPrevious=false;
       // Only successful batches advance the history; retries use the same request.
       const shown=data.items.map(r=>r.keyword_key),shownSet=new Set(shown);
       seenKeys=[...seenKeys.filter(k=>!shownSet.has(k)),...shown].slice(-500);
       render();
-      const updated=$('[data-personal-updated]');
-      updated.hidden=false;
-      updated.textContent='추천 확인: '+new Date(loadedAt).toLocaleString('ko-KR',{timeZone:'Asia/Seoul',month:'long',day:'numeric',hour:'numeric',minute:'2-digit',second:'2-digit'})+' · 한국시간';
+      showCheckedTime();
       if(!data.items.length)status('현재 기록과 연결되는 추천 후보가 아직 없습니다.');
       else if(!rotating)status('최신 저장 기록으로 맞춤 추천 '+num(data.items.length)+'개를 불러왔습니다.');
       else if(!data.different_count)status('현재 조건에 맞는 다른 후보가 부족해 기존 추천을 다시 보여드립니다.');
@@ -147,7 +164,8 @@ export function createPersonalKeywords(client,{root,onSaved=()=>{}}){
       if(current())status((isTemporaryError(error)?'맞춤 추천 조회가 지연되고 있습니다.':'맞춤 추천을 불러오지 못했습니다.')+(data?' 이전에 확인한 추천을 표시합니다.':'')+' 잠시 후 추천 새로고침을 눌러 주세요.',true);
     }finally{if(current())busy(false);}
   }
+  $('[data-personal-previous]').addEventListener('click',showPrevious);
   $('[data-personal-refresh]').addEventListener('click',()=>load(true));
   root.addEventListener('click',async e=>{const b=e.target.closest('[data-personal-save]');if(!b||b.disabled||!user)return;const row=data?.items.find(r=>r.keyword_key===b.dataset.personalSave);if(!row)return;const g=epoch;b.disabled=true;try{const result=await client.rpc('keychallenge_save_blog_keyword',{p_keyword:row.keyword});if(g!==epoch)return;if(result.error)throw result.error;saved.add(row.keyword_key);render();onSaved(row);}catch(error){if(g===epoch){b.disabled=false;$('[data-personal-status]').textContent=error.message||'보관하지 못했습니다.';}}});
-  return {load,setContext(next,p){epoch++;request++;user=next;profile=p;data=null;loadedAt=0;seenKeys=[];saved.clear();busy(false);status('');$('[data-personal-updated]').hidden=true;$('[data-personal-updated]').textContent='';$('[data-personal-basis]').innerHTML='';$('[data-personal-cards]').innerHTML='';}};
+  return {load,setContext(next,p){epoch++;request++;user=next;profile=p;data=null;loadedAt=0;seenKeys=[];previousBatches=[];viewingPrevious=false;saved.clear();busy(false);status('');$('[data-personal-updated]').hidden=true;$('[data-personal-updated]').textContent='';$('[data-personal-basis]').innerHTML='';$('[data-personal-cards]').innerHTML='';}};
 }
