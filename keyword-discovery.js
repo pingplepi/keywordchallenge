@@ -1,3 +1,5 @@
+import { INTEREST_FIELDS, normalizeInterestField } from './interest-fields.js';
+
 // Dashboard contexts stay with their owners; their recommendation views share one explorer.
 const recommendationViews=new Map();
 let discoveryHost=null;
@@ -17,89 +19,8 @@ const num=v=>Number(v||0).toLocaleString('ko-KR');
 const range=(a,b)=>a==null?'미확인':a===b?num(a):num(a)+'–'+num(b);
 const date=v=>v?new Date(v).toLocaleDateString('ko-KR',{timeZone:'Asia/Seoul',month:'numeric',day:'numeric'}):'미확인';
 const key=v=>v.replace(/\s/g,'').toUpperCase();
-const topics={
-  "여행": [
-    "국내여행",
-    "해외여행",
-    "여행준비"
-  ],
-  "뷰티": [
-    "스킨케어",
-    "메이크업",
-    "헤어케어"
-  ],
-  "패션": [
-    "여성패션",
-    "남성패션",
-    "패션잡화"
-  ],
-  "푸드": [
-    "레시피",
-    "맛집",
-    "카페"
-  ],
-  "리빙": [
-    "살림",
-    "인테리어",
-    "생활용품"
-  ],
-  "육아": [
-    "육아용품",
-    "육아놀이",
-    "아이랑가볼만한곳"
-  ],
-  "IT테크": [
-    "스마트폰",
-    "노트북",
-    "AI활용"
-  ],
-  "자동차": [
-    "전기차",
-    "중고차",
-    "자동차용품"
-  ],
-  "경제/비즈니스": [
-    "생활경제",
-    "창업",
-    "마케팅"
-  ],
-  "생활건강": [
-    "건강관리",
-    "건강식단",
-    "수면"
-  ],
-  "운동/레저": [
-    "운동",
-    "등산",
-    "캠핑"
-  ],
-  "도서": [
-    "책추천",
-    "독서",
-    "독서모임"
-  ],
-  "문화/예술": [
-    "전시회",
-    "뮤지컬",
-    "공연"
-  ],
-  "게임": [
-    "모바일게임",
-    "PC게임",
-    "콘솔게임"
-  ],
-  "동물/펫": [
-    "강아지용품",
-    "고양이용품",
-    "반려동물"
-  ],
-  "어학/교육": [
-    "영어공부",
-    "자격증",
-    "학습법"
-  ],
-  "직접 입력": []
-};
+const topicFields=[...INTEREST_FIELDS,{value:'직접 입력',seeds:[]}];
+const topics=Object.fromEntries(topicFields.map(field=>[field.value,field.seeds]));
 export function createTopicDiscovery(client,{root,onSaved=()=>{}}){
   let user=null,settings=null,epoch=0,sequence=0,controller=null,all=[],titles=[],postCount=0,tab='personal',visible=false;
   const saved=new Set();
@@ -109,7 +30,7 @@ export function createTopicDiscovery(client,{root,onSaved=()=>{}}){
   nav.innerHTML=methods.map(([id,label,button,panel])=>'<button type="button" role="tab" id="'+button+'" aria-controls="'+panel+'" aria-selected="'+(id===tab)+'" tabindex="'+(id===tab?0:-1)+'" data-discovery-tab="'+id+'">'+label+'</button>').join('');
   const directPanel=document.createElement('div');directPanel.id='directKeywordPanel';directPanel.setAttribute('role','tabpanel');directPanel.setAttribute('aria-labelledby','directKeywordTab');direct.forEach(el=>directPanel.append(el));root.append(nav,directPanel);
   const panel=document.createElement('section');panel.id='topicKeywordPanel';panel.className='panel work-panel topic-discovery';panel.hidden=true;panel.setAttribute('role','tabpanel');panel.setAttribute('aria-labelledby','topicKeywordTab');
-  panel.innerHTML='<h2>주제별 인기 키워드 TOP 20</h2><p class="muted">관심 분야와 원하는 키워드로 검색량이 높은 연관 키워드를 찾아보세요.</p><form data-topic-form><div class="work-filters"><label>분야<select data-topic-field>'+Object.keys(topics).map(x=>'<option>'+esc(x)+'</option>').join('')+'</select></label></div><label>대표 키워드 · 최대 3개<input data-topic-seeds maxlength="100" required placeholder="예: 나트랑여행, 나트랑마사지, 나트랑숙소" /></label><p class="muted small">분야별 예시는 자유롭게 바꿀 수 있습니다. 원하는 키워드를 쉼표로 구분해, 각각 30자 이내로 입력해 주세요.</p><button class="button" data-topic-submit>인기 키워드 찾기</button></form><p class="catalog-footnote">대표 키워드별 검색광고 연관어를 합쳐 중복을 제거합니다. 주제 전체의 검색 순위는 아니며, 최근 30일 안에 조회한 결과는 함께 재사용합니다. 기본·플러스 등급의 일일 조회 한도는 없으며, 짧은 시간의 연속 요청만 제한합니다.</p><p class="message" data-topic-status role="status">주제를 선택한 뒤 버튼을 눌러 주세요.</p><div data-topic-result hidden><div class="work-filters"><label>결과 안에서 찾기<input data-topic-filter type="search" maxlength="100" placeholder="예: 숙소" /></label><label class="topic-toggle"><input type="checkbox" data-topic-new checked />최근 글 제목에 없는 키워드 우선</label></div><p class="muted small" data-topic-summary></p><div class="opportunity-grid" data-topic-cards></div></div>';
+  panel.innerHTML='<h2>주제별 인기 키워드 TOP 20</h2><p class="muted">관심 분야와 원하는 키워드로 검색량이 높은 연관 키워드를 찾아보세요.</p><form data-topic-form><div class="work-filters"><label>분야<select data-topic-field>'+topicFields.map(field=>'<option value="'+esc(field.value)+'">'+esc(field.label||field.value)+'</option>').join('')+'</select></label></div><label>대표 키워드 · 최대 3개<input data-topic-seeds maxlength="100" required placeholder="예: 나트랑여행, 나트랑마사지, 나트랑숙소" /></label><p class="muted small">분야별 예시는 자유롭게 바꿀 수 있습니다. 원하는 키워드를 쉼표로 구분해, 각각 30자 이내로 입력해 주세요.</p><button class="button" data-topic-submit>인기 키워드 찾기</button></form><p class="catalog-footnote">대표 키워드별 검색광고 연관어를 합쳐 중복을 제거합니다. 주제 전체의 검색 순위는 아니며, 최근 30일 안에 조회한 결과는 함께 재사용합니다. 기본·플러스 등급의 일일 조회 한도는 없으며, 짧은 시간의 연속 요청만 제한합니다.</p><p class="message" data-topic-status role="status">주제를 선택한 뒤 버튼을 눌러 주세요.</p><div data-topic-result hidden><div class="work-filters"><label>결과 안에서 찾기<input data-topic-filter type="search" maxlength="100" placeholder="예: 숙소" /></label><label class="topic-toggle"><input type="checkbox" data-topic-new checked />최근 글 제목에 없는 키워드 우선</label></div><p class="muted small" data-topic-summary></p><div class="opportunity-grid" data-topic-cards></div></div>';
   root.append(panel);const $=s=>panel.querySelector(s);
   const personalPanel=document.createElement('section');personalPanel.id='personalKeywordPanel';personalPanel.className='panel work-panel';personalPanel.setAttribute('role','tabpanel');personalPanel.setAttribute('aria-labelledby','personalKeywordTab');
   const opportunityPanel=document.createElement('div');opportunityPanel.id='opportunitiesKeywordPanel';opportunityPanel.setAttribute('role','tabpanel');opportunityPanel.setAttribute('aria-labelledby','opportunitiesKeywordTab');root.append(personalPanel,opportunityPanel);
@@ -166,7 +87,7 @@ export function createTopicDiscovery(client,{root,onSaved=()=>{}}){
     finally{if(g===epoch&&v===sequence)$('[data-topic-submit]').disabled=false;}
   });
   panel.addEventListener('click',async e=>{const b=e.target.closest('[data-topic-save]');if(!b||b.disabled||!user)return;const row=all.find(r=>r.keyword_key===b.dataset.topicSave);if(!row)return;const g=epoch;b.disabled=true;try{const result=await client.rpc('keychallenge_save_blog_keyword',{p_keyword:row.keyword});if(g!==epoch)return;if(result.error)throw result.error;saved.add(row.keyword_key);render();onSaved();}catch(error){if(g===epoch){b.disabled=false;$('[data-topic-status]').textContent=error.message||'보관하지 못했습니다.';}}});
-  return {direct:()=>choose('direct'),show(page){visible=page==='keywordSearchView';sync();},setContext(next,nextSettings){epoch++;sequence++;controller?.abort();user=next;settings=nextSettings;all=[];titles=[];postCount=0;saved.clear();$('[data-topic-result]').hidden=true;$('[data-topic-submit]').disabled=false;$('[data-topic-status]').textContent='주제를 선택한 뒤 버튼을 눌러 주세요.';$('[data-topic-field]').value=Object.hasOwn(topics,settings?.interest)?settings.interest:'여행';seeds();choose('personal');}};
+  return {direct:()=>choose('direct'),show(page){visible=page==='keywordSearchView';sync();},setContext(next,nextSettings){epoch++;sequence++;controller?.abort();user=next;settings=nextSettings;all=[];titles=[];postCount=0;saved.clear();$('[data-topic-result]').hidden=true;$('[data-topic-submit]').disabled=false;$('[data-topic-status]').textContent='주제를 선택한 뒤 버튼을 눌러 주세요.';$('[data-topic-field]').value=Object.hasOwn(topics,normalizeInterestField(settings?.interest))?normalizeInterestField(settings.interest):'여행';seeds();choose('personal');}};
 }
 export function createPersonalKeywords(client,{root,onSaved=()=>{}}){
   let user=null,profile=null,epoch=0,request=0,data=null,loading=false,loadedAt=0;const saved=new Set();
