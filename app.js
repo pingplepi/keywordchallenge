@@ -56,6 +56,13 @@ function showExistingAccount() {
   byId('authRecoveryLink').hidden = true;
 }
 
+function showSignupEmailNotice(email) {
+  const dialog = byId('signupEmailDialog');
+  if (!dialog) return;
+  byId('signupEmailAddress').textContent = email;
+  if (!dialog.open) dialog.showModal();
+}
+
 function isDuplicateSignup(data, error) {
   if (error) return ['user_already_exists', 'email_exists'].includes(error.code)
     || /^(user already registered|email already (?:registered|exists))\.?$/i.test(error.message || '');
@@ -88,6 +95,7 @@ async function onSessionChanged(nextSession) {
   const version = ++sessionVersion;
   const changedUser = session?.user.id !== nextSession?.user.id;
   session = nextSession;
+  if (session && byId('signupEmailDialog')?.open) byId('signupEmailDialog').close();
   collaboration?.setUser(session?.user || null);
   blogAnalysis?.setUser(session?.user || null);
   searchad?.setUser(session?.user || null);
@@ -448,7 +456,8 @@ async function handleAuthSubmit(event) {
         window.location.replace('#strategyView');
       }
       else if (data?.user && Array.isArray(data.user.identities) && data.user.identities.length > 0) {
-        setAuthMessage('이메일 인증 후 가입이 완료됩니다. 받은 메일의 인증 링크를 누른 뒤 로그인해 주세요. 메일이 보이지 않으면 스팸함도 확인해 주세요.');
+        setAuthMessage('인증메일을 보냈어요. 메일함의 인증 링크를 누른 뒤 로그인해 주세요. 메일이 보이지 않으면 스팸함도 확인해 주세요.', 'success');
+        showSignupEmailNotice(email);
       } else {
         setAuthMessage('가입 완료 여부를 확인하지 못했습니다. 이미 가입하셨다면 로그인하거나 비밀번호를 재설정해 주세요.', 'error');
         byId('authExistingActions').hidden = false;

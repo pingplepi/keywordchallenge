@@ -120,6 +120,17 @@
         </form>
       </section>
 
+      <dialog id="signupEmailDialog" class="signup-email-dialog" aria-labelledby="signupEmailTitle" aria-describedby="signupEmailDescription signupEmailHelp">
+        <div class="signup-email-icon" aria-hidden="true">
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="3"/><path d="m4 7 8 6 8-6"/></svg>
+        </div>
+        <h2 id="signupEmailTitle">인증메일을 보냈어요</h2>
+        <p id="signupEmailDescription">메일함을 확인해 주세요.</p>
+        <p id="signupEmailAddress" class="signup-email-address"></p>
+        <p id="signupEmailHelp" class="muted">메일의 인증 링크를 누르면 가입이 완료됩니다.<br />메일이 보이지 않으면 스팸함도 확인해 주세요.</p>
+        <form method="dialog"><button class="button button-wide" type="submit" autofocus>확인</button></form>
+      </dialog>
+
       <section id="appView" hidden aria-labelledby="influencerSettingsTitle">
         <div class="page-heading">
           <div><p class="eyebrow">INFLUENCER SETTINGS</p><h2 id="influencerSettingsTitle">인플홈 관리</h2><p class="muted">인플홈 연결과 키워드 챌린지 순위 갱신을 설정하세요.</p></div>
