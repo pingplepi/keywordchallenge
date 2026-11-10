@@ -8,8 +8,10 @@ const states = {queued:'글 수집 대기',running:'글 수집 중',succeeded:'�
 const empty = message => `<div class="work-empty">${esc(message)}</div>`;
 export function createBlogAnalysis(client, getProfile = () => '') {
   let user=null,epoch=0,version=0,connectionVersion=0,page=1,visible=false,pollTimer,filterTimer,busy=false,refreshing=false,canManageApi=false;
+  let retrying=false;
   let metricsBusy=false; const metricsRequests=new Map();
   $('blogAnalysisView').innerHTML=`<div class="work-heading"><div><p class="eyebrow">YOUR BLOG · AT A GLANCE</p><h1>내 블로그 분석</h1><p class="muted">로그인하면 새 글을 자동으로 가져옵니다. 검색 노출은 필요할 때 버튼으로 점검하세요.</p></div><a class="button button-light" href="#accountView">블로그 연결·설정 ↗</a></div>
+    <div id="analysisLoading" class="analysis-loading" role="status" hidden></div>
     <p id="analysisMessage" class="message" role="status"></p>
     <div id="analysisContent" hidden>
       <section class="panel work-panel analysis-connection"><div class="analysis-collection-info"><div id="analysisIdentity" class="work-identity"></div><p id="analysisUpdated" class="muted small"></p><p class="muted small">로그인할 때 새 글을 자동으로 가져옵니다. 이 화면을 열거나 새로고침해도 갱신됩니다.</p><p id="analysisSearchStatus" class="muted small" role="status"></p></div><div class="analysis-check-actions"><p id="analysisSearchSummary" class="small" aria-live="polite"></p><button id="blogCheckSearch" class="button">검색 노출 점검</button><small class="muted">최근 글 최대 20개 · 한국시간 자정 초기화</small></div></section>
@@ -70,9 +72,14 @@ export function createBlogAnalysis(client, getProfile = () => '') {
   }
   async function load(){
     if(!user||!visible)return;const g=epoch,v=++version;clearTimeout(pollTimer);
+    const loading=$('analysisLoading');
+    message('');
+    loading.hidden=false;
+    loading.textContent=retrying?'블로그 분석을 다시 불러오는 중입니다…':$('analysisContent').hidden?'블로그 분석을 불러오는 중입니다…':'블로그 분석을 갱신하는 중입니다…';
     try{
       const {data,error}=await client.rpc('keychallenge_blog_title_dashboard',{p_review:false,p_profile:getProfile(),p_query:$('analysisQuery').value.trim(),p_status:$('analysisFilter').value,p_page:page});
       if(error)throw error;if(g!==epoch||v!==version)return;
+      retrying=false;loading.hidden=true;
       page=data.page||page;
       const m=data.monitor,connection=data.connection||{},connected=connection.configured&&connection.enabled,search=data.search_job;
       $('analysisContent').hidden=!m;
@@ -102,7 +109,7 @@ export function createBlogAnalysis(client, getProfile = () => '') {
       const nextWake=[Date.parse(data.daily_check_reset_at),m.status==='queued'?Date.parse(m.next_attempt_at):0].filter(t=>t>Date.now());
       schedule(data.items.some(item=>item.body_metrics_status==='queued')||searchActive||m.status==='running'||(m.status==='queued'&&Date.parse(m.next_attempt_at)<=Date.now()+60000),nextWake.length?Math.min(...nextWake):0);
       void requestBodyMetrics(data.items,g);
-    }catch(error){if(g===epoch&&v===version){message('블로그 분석 정보를 불러오지 못했습니다. 잠시 후 다시 열어 주세요.',true);schedule(true);}}
+    }catch(error){if(g===epoch&&v===version){retrying=true;loading.hidden=false;loading.textContent='조회가 지연되어 잠시 후 자동으로 다시 시도합니다.';schedule(true);}}
   }
   async function refreshPosts(){
     if(!user||refreshing)return;
@@ -184,5 +191,5 @@ export function createBlogAnalysis(client, getProfile = () => '') {
   $('blogApiForm').addEventListener('submit',e=>{e.preventDefault();void saveConnection('save');});
   $('blogApiPause').addEventListener('click',()=>void saveConnection('pause'));
   $('blogApiConfirm').addEventListener('click',()=>void saveConnection('confirm'));
-  return {setUser(next){if(user?.id===next?.id)return;user=next;epoch++;version++;connectionVersion++;canManageApi=false;admin.hidden=true;for(const id of ['blogApiSetupIntro','blogApiForm','blogApiActions','blogApiMessage'])$(id).hidden=true;page=1;busy=false;refreshing=false;metricsBusy=false;metricsRequests.clear();clearTimeout(pollTimer);clearTimeout(filterTimer);$('analysisContent').hidden=true;$('analysisQuery').value='';$('analysisFilter').value='';$('blogApiForm').reset();$('blogApiMessage').textContent='';$('blogApiSave').disabled=false;$('blogApiPause').disabled=false;$('blogApiConfirm').disabled=false;$('blogApiUsage').textContent='';message('');if(user){void connection();void refreshPosts();}},show(name){const wasVisible=visible;visible=name==='blogAnalysisView';if(visible){if(wasVisible)void load();else void refreshPosts();}else clearTimeout(pollTimer);if(name==='catalogAdmin')void connection(true);}};
+  return {setUser(next){if(user?.id===next?.id)return;retrying=false;$('analysisLoading').hidden=true;user=next;epoch++;version++;connectionVersion++;canManageApi=false;admin.hidden=true;for(const id of ['blogApiSetupIntro','blogApiForm','blogApiActions','blogApiMessage'])$(id).hidden=true;page=1;busy=false;refreshing=false;metricsBusy=false;metricsRequests.clear();clearTimeout(pollTimer);clearTimeout(filterTimer);$('analysisContent').hidden=true;$('analysisQuery').value='';$('analysisFilter').value='';$('blogApiForm').reset();$('blogApiMessage').textContent='';$('blogApiSave').disabled=false;$('blogApiPause').disabled=false;$('blogApiConfirm').disabled=false;$('blogApiUsage').textContent='';message('');if(user){void connection();void refreshPosts();}},show(name){const wasVisible=visible;visible=name==='blogAnalysisView';if(visible){if(wasVisible)void load();else void refreshPosts();}else clearTimeout(pollTimer);if(name==='catalogAdmin')void connection(true);}};
 }
