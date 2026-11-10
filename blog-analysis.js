@@ -49,15 +49,16 @@ export function createBlogAnalysis(client, getProfile = () => '') {
   function bodyMetrics(item){ const m=item.body_metrics; const status=item.body_metrics_status||'pending'; const valid=m&&['characters_with_spaces','characters_without_spaces','images'].every(k=>Number.isInteger(m[k])&&m[k]>=0); const state=status==='queued'?'갱신 대기':status==='unavailable'?'집계 불가':''; if(!valid)return `<div class="analysis-body-metrics"><p class="muted small">${status==='unavailable'?'본문 집계 불가':'본문 글자 수·이미지 수 집계 대기'}</p>${item.body_metrics_error?`<p class="muted small">${esc(item.body_metrics_error)}</p>`:''}</div>`; return `<div class="analysis-body-metrics"><div class="analysis-body-values"><span>글자 수 <b>${num(m.characters_with_spaces)}자</b> <small>공백 포함</small></span><span><b>${num(m.characters_without_spaces)}자</b> <small>공백 제외</small></span><span>이미지 <b>${num(m.images)}장</b></span></div><p class="muted small">${state?`${state} · 이전 `:''}집계 ${esc(stamp(item.body_metrics_at))}${item.body_metrics_title&&item.body_metrics_title!==item.title?' · 집계 후 제목 변경':''}</p>${item.body_metrics_error?`<p class="muted small">${esc(item.body_metrics_error)}</p>`:''}</div>`; }
   async function requestBodyMetrics(items,g){if(!user||!visible||metricsBusy)return; const now=Date.now();const due=items.filter(item=>item.body_metrics_status!=='queued'&&(!item.body_metrics_attempted_at||Date.parse(item.body_metrics_attempted_at)<now-(item.body_metrics_status==='unavailable'?3600000:86400000))&&(!metricsRequests.has(item.blog_id+'/'+item.post_id)||metricsRequests.get(item.blog_id+'/'+item.post_id)<now-60000));if(!due.length)return;metricsBusy=true;due.forEach(item=>metricsRequests.set(item.blog_id+'/'+item.post_id,now));try{const {data,error}=await client.rpc('keychallenge_request_blog_metrics',{p_post_ids:due.map(item=>item.post_id)});if(g!==epoch)return;if(error)throw error;$('analysisMetricsMessage').textContent='';if(data?.queued>0&&visible)await load();}catch{if(g===epoch&&visible)$('analysisMetricsMessage').textContent='본문 집계를 요청하지 못했습니다. 기존 검색 결과는 그대로 유지됩니다. 잠시 후 화면을 새로고침해 주세요.';}finally{if(g===epoch)metricsBusy=false;}}
   function titleChallenges(challenges = []) {
-    const review = challenges.filter(item => item.status !== 'same');
+    const review = challenges.filter(item => item.status !== 'same' && item.status !== 'other');
+    const other = challenges.filter(item => item.status === 'other');
     const same = challenges.filter(item => item.status === 'same');
     const list = items => items.map(item => esc(item.name)).join(' · ');
-    const badges = review.map(item => {
+    const badges = items => items.map(item => {
       const name = esc(item.name);
       if (!/^[0-9]+$/.test(String(item.keyword_id || ''))) return `<span class="analysis-keyword-badge">${name}</span>`;
       return `<a class="analysis-keyword-badge" href="https://in.naver.com/challenge/select/${encodeURIComponent(item.keyword_id)}" target="_blank" rel="noopener noreferrer" aria-label="${name} 네이버 키챌 참여 (새 창)">${name} ↗</a>`;
     }).join('');
-    return `<div class="analysis-title-challenges"><strong>확인할 키챌 ${review.length}개</strong>${badges ? `<p class="analysis-review-line">${badges}</p>` : ''}${same.length ? `<details><summary>이 글로 참여 확인 · ${same.length}개</summary><p>${list(same)}</p></details>` : ''}</div>`;
+    return `<div class="analysis-title-challenges"><strong>확인할 키챌 ${review.length}개</strong>${review.length ? `<p class="analysis-review-line">${badges(review)}</p>` : ''}${other.length ? `<details><summary>다른 글로 참여 확인 · ${other.length}개</summary><p class="analysis-review-line">${badges(other)}</p></details>` : ''}${same.length ? `<details><summary>이 글로 참여 확인 · ${same.length}개</summary><p>${list(same)}</p></details>` : ''}</div>`;
   }
   function row(item,connected){
     const status=item.check_status;
