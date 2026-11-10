@@ -28,6 +28,34 @@ let memberReady = false;
 let sessionVersion = 0;
 let refreshSchedule = null;
 let refreshViewVersion = 0;
+let activeVisitId = null;
+let activeVisitUserId = null;
+const memberVisitStorageKey = 'keyon.member.visit';
+
+function createMemberVisitId() {
+  if (globalThis.crypto?.randomUUID) return crypto.randomUUID();
+  const bytes = crypto.getRandomValues(new Uint8Array(16));
+  bytes[6] = (bytes[6] & 0x0f) | 0x40;
+  bytes[8] = (bytes[8] & 0x3f) | 0x80;
+  const hex = [...bytes].map(value => value.toString(16).padStart(2, '0')).join('');
+  return `${hex.slice(0,8)}-${hex.slice(8,12)}-${hex.slice(12,16)}-${hex.slice(16,20)}-${hex.slice(20)}`;
+}
+
+function getMemberVisitId(userId, startNew = false) {
+  if (!startNew && activeVisitId && activeVisitUserId === userId) return activeVisitId;
+  try {
+    const stored = JSON.parse(sessionStorage.getItem(memberVisitStorageKey) || 'null');
+    if (!startNew && stored?.userId === userId && stored?.id) {
+      activeVisitId = stored.id;
+      activeVisitUserId = userId;
+      return activeVisitId;
+    }
+  } catch { /* Storage may be unavailable in a restricted browser context. */ }
+  activeVisitId = createMemberVisitId();
+  activeVisitUserId = userId;
+  try { sessionStorage.setItem(memberVisitStorageKey, JSON.stringify({userId,id:activeVisitId})); } catch { /* Keep the visit in memory for this page. */ }
+  return activeVisitId;
+}
 
 function showView(name) {
   for (const [key, element] of Object.entries(views)) element.hidden = key !== name;
@@ -100,7 +128,15 @@ async function onSessionChanged(nextSession, authEvent = 'restore') {
   blogAnalysis?.setUser(session?.user || null);
   searchad?.setUser(session?.user || null);
   void membership?.setUser(session?.user || null);
-  if (session) void membership?.recordActivity(authEvent === 'SIGNED_IN' ? 'signed_in' : 'restore');
+  if (session) {
+    activeVisitId = getMemberVisitId(session.user.id, authEvent === 'SIGNED_IN');
+    void membership?.recordActivity(authEvent === 'SIGNED_IN' ? 'signed_in' : 'restore', activeVisitId);
+    void membership?.recordActivity('visit', activeVisitId);
+  } else {
+    activeVisitId = null;
+    activeVisitUserId = null;
+    try { sessionStorage.removeItem(memberVisitStorageKey); } catch { /* Ignore unavailable storage. */ }
+  }
   if (changedUser) { member = null; memberReady = false; }
   showPage();
   if (changedUser) {
@@ -503,17 +539,21 @@ async function initialize() {
 }
 
 let lastActivitySent = 0;
-function reportMemberActivity() {
+function reportMemberActivity(event = 'active') {
   if (!session || document.visibilityState === 'hidden') return;
+  if (event === 'restore') {
+    void membership?.recordActivity('restore', activeVisitId);
+    return;
+  }
   const now = Date.now();
   if (now - lastActivitySent < 60_000) return;
   lastActivitySent = now;
-  void membership?.recordActivity('active');
+  void membership?.recordActivity('active', activeVisitId);
 }
 document.addEventListener('pointerdown', reportMemberActivity, { passive: true });
 document.addEventListener('keydown', reportMemberActivity);
 document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'visible') reportMemberActivity();
+  if (document.visibilityState === 'visible') reportMemberActivity('restore');
 });
 
 document.querySelectorAll('.auth-tab').forEach((tab) => tab.addEventListener('click', () => setAuthMode(tab.dataset.mode)));
