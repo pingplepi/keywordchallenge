@@ -516,7 +516,7 @@ async function initialize() {
   catalog = createCatalog(supabase);
   strategy = createStrategy(supabase, {getInterest:()=>member?.interest});
   membership = createMembershipManager(supabase);
-  blogAnalysis = createBlogAnalysis(supabase);
+  blogAnalysis = createBlogAnalysis(supabase, () => activeId);
   collaboration = createCollaborationManager(supabase);
   workspace = createBloggerWorkspace(supabase, { onMemberChange(next, ready = true) {
     member = next; memberReady = ready;
