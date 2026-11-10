@@ -26,7 +26,7 @@ export function createTopicDiscovery(client,{root,onSaved=()=>{}}){
   const saved=new Set();
   const direct=[...root.querySelectorAll(':scope > section')];
   const nav=document.createElement('div');nav.className='opportunity-tabs discovery-search-tabs';nav.setAttribute('role','tablist');nav.setAttribute('aria-label','키워드 찾는 방법');
-  const methods=[['personal','맞춤 추천','personalKeywordTab','personalKeywordPanel'],['opportunity','기회 찾기','opportunitiesKeywordTab','opportunitiesKeywordPanel'],['topic','주제별 추천','topicKeywordTab','topicKeywordPanel'],['direct','직접 검색','directKeywordTab','directKeywordPanel']];
+  const methods=[['personal','맞춤 추천','personalKeywordTab','personalKeywordPanel'],['opportunity','기회 찾기','opportunitiesKeywordTab','opportunitiesKeywordPanel'],['topic','주제별 추천','topicKeywordTab','topicKeywordPanel'],['direct','직접 검색','directKeywordTab','directKeywordPanel'],['draft','제목으로 키챌 찾기','draftKeywordTab','draftKeywordPanel']];
   nav.innerHTML=methods.map(([id,label,button,panel])=>'<button type="button" role="tab" id="'+button+'" aria-controls="'+panel+'" aria-selected="'+(id===tab)+'" tabindex="'+(id===tab?0:-1)+'" data-discovery-tab="'+id+'">'+label+'</button>').join('');
   const directPanel=document.createElement('div');directPanel.id='directKeywordPanel';directPanel.setAttribute('role','tabpanel');directPanel.setAttribute('aria-labelledby','directKeywordTab');direct.forEach(el=>directPanel.append(el));root.append(nav,directPanel);
   const panel=document.createElement('section');panel.id='topicKeywordPanel';panel.className='panel work-panel topic-discovery';panel.hidden=true;panel.setAttribute('role','tabpanel');panel.setAttribute('aria-labelledby','topicKeywordTab');
@@ -34,7 +34,59 @@ export function createTopicDiscovery(client,{root,onSaved=()=>{}}){
   root.append(panel);const $=s=>panel.querySelector(s);
   const personalPanel=document.createElement('section');personalPanel.id='personalKeywordPanel';personalPanel.className='panel work-panel';personalPanel.setAttribute('role','tabpanel');personalPanel.setAttribute('aria-labelledby','personalKeywordTab');
   const opportunityPanel=document.createElement('div');opportunityPanel.id='opportunitiesKeywordPanel';opportunityPanel.setAttribute('role','tabpanel');opportunityPanel.setAttribute('aria-labelledby','opportunitiesKeywordTab');root.append(personalPanel,opportunityPanel);
-  const panels={personal:personalPanel,opportunity:opportunityPanel,topic:panel,direct:directPanel};
+  const draft=document.createElement('section');
+  draft.id='draftKeywordPanel';
+  draft.className='panel work-panel';
+  draft.setAttribute('role','tabpanel');
+  draft.setAttribute('aria-labelledby','draftKeywordTab');
+  draft.innerHTML=`<h2>제목으로 키챌 찾기</h2><label>작성할 글 제목<input type="text" maxlength="200" placeholder="예: 나트랑 마사지 후기" /></label><p class="muted small" role="status"></p><div data-draft-results></div>`;
+  root.append(draft);
+  const titleInput=draft.querySelector('input');
+  const draftStatus=draft.querySelector('[role="status"]');
+  const draftResults=draft.querySelector('[data-draft-results]');
+  let draftTimer,draftVersion=0;
+  function clearDraft(){
+    clearTimeout(draftTimer);
+    draftVersion++;
+    draftStatus.textContent='';
+    draftResults.replaceChildren();
+  }
+  function analyzeDraft(){
+    clearDraft();
+    const title=titleInput.value.trim();
+    if(!title || !user)return;
+    const version=draftVersion;
+    draftStatus.textContent='제목과 키챌을 비교하고 있습니다…';
+    draftTimer=setTimeout(async()=>{
+      try{
+        const {data,error}=await client.rpc('keychallenge_draft_title',{p_title:title});
+        if(version!==draftVersion)return;
+        if(error)throw error;
+        const fields=Array.isArray(data?.fields)?data.fields:[];
+        if(!fields.length || fields.every(f=>f==='기타')){
+          draftStatus.textContent='내 설정에서 주로 다루는 키챌 분야를 선택해 주세요.';
+          return;
+        }
+        draftStatus.textContent='확인한 분야 · '+fields.join(' · ');
+        for(const [heading,items,empty] of [
+          ['제목에 포함된 키챌',Array.isArray(data?.included)?data.included:[],'제목에서 일치하는 키챌을 찾지 못했습니다.'],
+          ['추가하면 좋을 키챌',Array.isArray(data?.related)?data.related:[],'제목과 연결되는 추가 후보가 없습니다.']
+        ]){
+          const group=document.createElement('section');
+          group.innerHTML='<h3>'+heading+'</h3>'+(items.length?'<ul>'+items.map(item=>
+            '<li><span class="analysis-keyword-badge">'+esc(item.name)+'</span> <small>'+esc(item.field)+(Array.isArray(item.terms)&&item.terms.length?' · 제목과 겹치는 표현: '+esc(item.terms.join(', ')):'')+'</small></li>'
+          ).join('')+'</ul>':'<p class="muted">'+empty+'</p>');
+          draftResults.append(group);
+        }
+      }catch{
+        if(version===draftVersion)draftStatus.textContent='키챌을 불러오지 못했습니다. 제목 입력칸에서 Enter를 눌러 다시 시도해 주세요.';
+      }
+    },400);
+  }
+  titleInput.addEventListener('input',event=>{if(!event.isComposing)analyzeDraft();else clearDraft();});
+  titleInput.addEventListener('compositionend',analyzeDraft);
+  titleInput.addEventListener('keydown',event=>{if(!event.isComposing&&event.key==='Enter')analyzeDraft();});
+  const panels={personal:personalPanel,opportunity:opportunityPanel,topic:panel,direct:directPanel,draft};
   function sync(){
     const mode=settings?.mode==='blogger'?'blogger':'influencer';
     for(const view of recommendationViews.values()){
@@ -87,7 +139,7 @@ export function createTopicDiscovery(client,{root,onSaved=()=>{}}){
     finally{if(g===epoch&&v===sequence)$('[data-topic-submit]').disabled=false;}
   });
   panel.addEventListener('click',async e=>{const b=e.target.closest('[data-topic-save]');if(!b||b.disabled||!user)return;const row=all.find(r=>r.keyword_key===b.dataset.topicSave);if(!row)return;const g=epoch;b.disabled=true;try{const result=await client.rpc('keychallenge_save_blog_keyword',{p_keyword:row.keyword});if(g!==epoch)return;if(result.error)throw result.error;saved.add(row.keyword_key);render();onSaved();}catch(error){if(g===epoch){b.disabled=false;$('[data-topic-status]').textContent=error.message||'보관하지 못했습니다.';}}});
-  return {direct:()=>choose('direct'),show(page){visible=page==='keywordSearchView';sync();},setContext(next,nextSettings){epoch++;sequence++;controller?.abort();user=next;settings=nextSettings;all=[];titles=[];postCount=0;saved.clear();$('[data-topic-result]').hidden=true;$('[data-topic-submit]').disabled=false;$('[data-topic-status]').textContent='주제를 선택한 뒤 버튼을 눌러 주세요.';$('[data-topic-field]').value=Object.hasOwn(topics,normalizeInterestField(settings?.interest))?normalizeInterestField(settings.interest):'여행';seeds();choose('personal');}};
+  return {direct:()=>choose('direct'),show(page){visible=page==='keywordSearchView';sync();},setContext(next,nextSettings){clearDraft();titleInput.value='';epoch++;sequence++;controller?.abort();user=next;settings=nextSettings;all=[];titles=[];postCount=0;saved.clear();$('[data-topic-result]').hidden=true;$('[data-topic-submit]').disabled=false;$('[data-topic-status]').textContent='주제를 선택한 뒤 버튼을 눌러 주세요.';$('[data-topic-field]').value=Object.hasOwn(topics,normalizeInterestField(settings?.interest))?normalizeInterestField(settings.interest):'여행';seeds();choose('personal');}};
 }
 export function createPersonalKeywords(client,{root,onSaved=()=>{}}){
   let user=null,profile=null,epoch=0,request=0,data=null,loading=false,loadedAt=0,seenKeys=[],previousBatches=[],viewingPrevious=false,savingKey=null,pendingRefill=null;const saved=new Set();
