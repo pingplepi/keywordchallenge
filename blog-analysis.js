@@ -6,7 +6,7 @@ const date = v => v ? new Date(v).toLocaleDateString('ko-KR',{timeZone:'Asia/Seo
 const labels = {pending:'검색 대기',found:'노출 확인',unconfirmed:'노출 미확인',error:'검색 오류'};
 const states = {queued:'글 수집 대기',running:'글 수집 중',succeeded:'글 수집 완료',failed:'수집 실패',paused:'자동 글 수집 꺼짐'};
 const empty = message => `<div class="work-empty">${esc(message)}</div>`;
-export function createBlogAnalysis(client) {
+export function createBlogAnalysis(client, getProfile = () => '') {
   let user=null,epoch=0,version=0,connectionVersion=0,page=1,visible=false,pollTimer,filterTimer,busy=false,refreshing=false,canManageApi=false;
   let metricsBusy=false; const metricsRequests=new Map();
   $('blogAnalysisView').innerHTML=`<div class="work-heading"><div><p class="eyebrow">YOUR BLOG · AT A GLANCE</p><h1>내 블로그 분석</h1><p class="muted">로그인하면 새 글을 자동으로 가져옵니다. 검색 노출은 필요할 때 버튼으로 점검하세요.</p></div><a class="button button-light" href="#accountView">블로그 연결·설정 ↗</a></div>
@@ -48,19 +48,31 @@ export function createBlogAnalysis(client) {
   }
   function bodyMetrics(item){ const m=item.body_metrics; const status=item.body_metrics_status||'pending'; const valid=m&&['characters_with_spaces','characters_without_spaces','images'].every(k=>Number.isInteger(m[k])&&m[k]>=0); const state=status==='queued'?'갱신 대기':status==='unavailable'?'집계 불가':''; if(!valid)return `<div class="analysis-body-metrics"><p class="muted small">${status==='unavailable'?'본문 집계 불가':'본문 글자 수·이미지 수 집계 대기'}</p>${item.body_metrics_error?`<p class="muted small">${esc(item.body_metrics_error)}</p>`:''}</div>`; return `<div class="analysis-body-metrics"><div class="analysis-body-values"><span>글자 수 <b>${num(m.characters_with_spaces)}자</b> <small>공백 포함</small></span><span><b>${num(m.characters_without_spaces)}자</b> <small>공백 제외</small></span><span>이미지 <b>${num(m.images)}장</b></span></div><p class="muted small">${state?`${state} · 이전 `:''}집계 ${esc(stamp(item.body_metrics_at))}${item.body_metrics_title&&item.body_metrics_title!==item.title?' · 집계 후 제목 변경':''}</p>${item.body_metrics_error?`<p class="muted small">${esc(item.body_metrics_error)}</p>`:''}</div>`; }
   async function requestBodyMetrics(items,g){if(!user||!visible||metricsBusy)return; const now=Date.now();const due=items.filter(item=>item.body_metrics_status!=='queued'&&(!item.body_metrics_attempted_at||Date.parse(item.body_metrics_attempted_at)<now-(item.body_metrics_status==='unavailable'?3600000:86400000))&&(!metricsRequests.has(item.blog_id+'/'+item.post_id)||metricsRequests.get(item.blog_id+'/'+item.post_id)<now-60000));if(!due.length)return;metricsBusy=true;due.forEach(item=>metricsRequests.set(item.blog_id+'/'+item.post_id,now));try{const {data,error}=await client.rpc('keychallenge_request_blog_metrics',{p_post_ids:due.map(item=>item.post_id)});if(g!==epoch)return;if(error)throw error;$('analysisMetricsMessage').textContent='';if(data?.queued>0&&visible)await load();}catch{if(g===epoch&&visible)$('analysisMetricsMessage').textContent='본문 집계를 요청하지 못했습니다. 기존 검색 결과는 그대로 유지됩니다. 잠시 후 화면을 새로고침해 주세요.';}finally{if(g===epoch)metricsBusy=false;}}
+  function titleChallenges(challenges = []) {
+    const review = challenges.filter(item => item.status !== 'same');
+    const same = challenges.filter(item => item.status === 'same');
+    const list = items => items.map(item => esc(item.name)).join(' · ');
+    const badges = review.map(item => {
+      const name = esc(item.name);
+      if (!/^[0-9]+$/.test(String(item.keyword_id || ''))) return `<span class="analysis-keyword-badge">${name}</span>`;
+      return `<a class="analysis-keyword-badge" href="https://in.naver.com/challenge/select/${encodeURIComponent(item.keyword_id)}" target="_blank" rel="noopener noreferrer" aria-label="${name} 네이버 키챌 참여 (새 창)">${name} ↗</a>`;
+    }).join('');
+    return `<div class="analysis-title-challenges"><strong>확인할 키챌 ${review.length}개</strong>${badges ? `<p class="analysis-review-line">${badges}</p>` : ''}${same.length ? `<details><summary>이 글로 참여 확인 · ${same.length}개</summary><p>${list(same)}</p></details>` : ''}</div>`;
+  }
   function row(item,connected){
     const status=item.check_status;
     const label=status==='pending'?(connected?'검색 대기':'검색 API 연결 대기'):labels[status];
     const url=`https://blog.naver.com/${encodeURIComponent(item.blog_id)}/${encodeURIComponent(item.post_id)}`;
     const evidence=(item.evidence||[]).map(e=>`<li><strong>${esc(e.query)}</strong><span>정확도순 최대 ${num(e.limit)}개 · 반환 ${num(e.returned)}개 · ${e.matched?'글 주소 일치':'글 주소 미확인'}</span></li>`).join('');
     const changed=status!=='error'&&item.previous_result&&item.previous_result!==item.last_result;
-    return `<article class="analysis-post"><div class="analysis-post-heading"><div><a class="analysis-post-title" href="${url}" target="_blank" rel="noopener noreferrer">${esc(item.title)} ↗</a><p class="muted small">발행 ${esc(date(item.published_at))} · 첫 수집 ${esc(stamp(item.first_seen_at))}</p></div><span class="analysis-state ${status}">${esc(label)}</span></div>${bodyMetrics(item)}${changed?`<p class="analysis-change">이전 ${esc(labels[item.previous_result])} → 현재 ${esc(labels[item.last_result])}</p>`:''}${item.check_error?`<p class="message error">${esc(item.check_error)}</p>`:''}<details><summary>${item.checked_at?`확인 기록 · ${esc(stamp(item.checked_at))}`:'확인 기준 보기'}</summary>${evidence?`<ul class="analysis-evidence">${evidence}</ul>`:'<p class="muted small">검색 노출 점검 버튼을 누르면 새 글을 가져온 뒤 최근 글 최대 20개를 확인합니다. 하루 3회까지 요청할 수 있습니다.</p>'}${status==='error'&&item.last_result?`<p>마지막 정상 확인: ${esc(labels[item.last_result])} · ${esc(stamp(item.last_result_at))}</p>`:''}<p class="muted small">조회한 검색어와 범위의 결과입니다. 검색 누락 여부나 실제 통합검색 순위를 의미하지 않습니다.</p></details></article>`;
+    return `<article class="analysis-post"><div class="analysis-post-heading"><div><a class="analysis-post-title" href="${url}" target="_blank" rel="noopener noreferrer">${esc(item.title)} ↗</a><p class="muted small">발행 ${esc(date(item.published_at))} · 첫 수집 ${esc(stamp(item.first_seen_at))}</p></div><span class="analysis-state ${status}">${esc(label)}</span></div>${titleChallenges(item.challenges || [])}${bodyMetrics(item)}${changed?`<p class="analysis-change">이전 ${esc(labels[item.previous_result])} → 현재 ${esc(labels[item.last_result])}</p>`:''}${item.check_error?`<p class="message error">${esc(item.check_error)}</p>`:''}<details><summary>${item.checked_at?`확인 기록 · ${esc(stamp(item.checked_at))}`:'확인 기준 보기'}</summary>${evidence?`<ul class="analysis-evidence">${evidence}</ul>`:'<p class="muted small">검색 노출 점검 버튼을 누르면 새 글을 가져온 뒤 최근 글 최대 20개를 확인합니다. 하루 3회까지 요청할 수 있습니다.</p>'}${status==='error'&&item.last_result?`<p>마지막 정상 확인: ${esc(labels[item.last_result])} · ${esc(stamp(item.last_result_at))}</p>`:''}<p class="muted small">조회한 검색어와 범위의 결과입니다. 검색 누락 여부나 실제 통합검색 순위를 의미하지 않습니다.</p></details></article>`;
   }
   async function load(){
     if(!user||!visible)return;const g=epoch,v=++version;clearTimeout(pollTimer);
     try{
-      const {data,error}=await client.rpc('keychallenge_blog_dashboard',{p_query:$('analysisQuery').value.trim(),p_status:$('analysisFilter').value,p_page:page});
+      const {data,error}=await client.rpc('keychallenge_blog_title_dashboard',{p_review:false,p_profile:getProfile(),p_query:$('analysisQuery').value.trim(),p_status:$('analysisFilter').value,p_page:page});
       if(error)throw error;if(g!==epoch||v!==version)return;
+      page=data.page||page;
       const m=data.monitor,connection=data.connection||{},connected=connection.configured&&connection.enabled,search=data.search_job;
       $('analysisContent').hidden=!m;
       if(!m){$('analysisMessage').innerHTML='<div class="panel work-panel"><h2>블로그 주소를 한 번만 연결하세요</h2><p>최근 글 자동 수집을 시작합니다. 검색 노출 점검은 연결 후 버튼으로 요청할 수 있습니다.</p><a class="button" href="#accountView">내 블로그 연결하기 ↗</a></div>';return;}
