@@ -91,7 +91,7 @@ function normalizeId(value) {
   return input.replace(/^\/+|\/+$/g, '').split(/[?#]/)[0];
 }
 
-async function onSessionChanged(nextSession) {
+async function onSessionChanged(nextSession, authEvent = 'restore') {
   const version = ++sessionVersion;
   const changedUser = session?.user.id !== nextSession?.user.id;
   session = nextSession;
@@ -100,6 +100,7 @@ async function onSessionChanged(nextSession) {
   blogAnalysis?.setUser(session?.user || null);
   searchad?.setUser(session?.user || null);
   void membership?.setUser(session?.user || null);
+  if (session) void membership?.recordActivity(authEvent === 'SIGNED_IN' ? 'signed_in' : 'restore');
   if (changedUser) { member = null; memberReady = false; }
   showPage();
   if (changedUser) {
@@ -496,10 +497,24 @@ async function initialize() {
   const { data: { session: currentSession }, error } = await supabase.auth.getSession();
   if (error) notify(error.message, true);
   await onSessionChanged(currentSession);
-  supabase.auth.onAuthStateChange((_event, nextSession) => {
-    queueMicrotask(() => onSessionChanged(nextSession));
+  supabase.auth.onAuthStateChange((event, nextSession) => {
+    queueMicrotask(() => onSessionChanged(nextSession, event));
   });
 }
+
+let lastActivitySent = 0;
+function reportMemberActivity() {
+  if (!session || document.visibilityState === 'hidden') return;
+  const now = Date.now();
+  if (now - lastActivitySent < 60_000) return;
+  lastActivitySent = now;
+  void membership?.recordActivity('active');
+}
+document.addEventListener('pointerdown', reportMemberActivity, { passive: true });
+document.addEventListener('keydown', reportMemberActivity);
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') reportMemberActivity();
+});
 
 document.querySelectorAll('.auth-tab').forEach((tab) => tab.addEventListener('click', () => setAuthMode(tab.dataset.mode)));
 byId('authForm').addEventListener('submit', handleAuthSubmit);
