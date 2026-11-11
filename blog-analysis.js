@@ -6,16 +6,16 @@ const date = v => v ? new Date(v).toLocaleDateString('ko-KR',{timeZone:'Asia/Seo
 const labels = {pending:'검색 대기',found:'노출 확인',unconfirmed:'노출 미확인',error:'검색 오류'};
 const states = {queued:'글 수집 대기',running:'글 수집 중',succeeded:'글 수집 완료',failed:'수집 실패',paused:'자동 글 수집 꺼짐'};
 const empty = message => `<div class="work-empty">${esc(message)}</div>`;
-export function createBlogAnalysis(client, getProfile = () => '') {
+export function createBlogAnalysis(client, getProfile = () => '', refreshProfile = async () => false) {
   let user=null,epoch=0,version=0,connectionVersion=0,page=1,visible=false,pollTimer,filterTimer,busy=false,refreshing=false,canManageApi=false;
   let retrying=false,profileRefreshTimer;
   let metricsBusy=false; const metricsRequests=new Map();
-  $('blogAnalysisView').innerHTML=`<div class="work-heading"><div><p class="eyebrow">YOUR BLOG · AT A GLANCE</p><h1>내 블로그 분석</h1><p class="muted">로그인하면 새 글을 자동으로 가져옵니다. 인플홈 자동 갱신이 켜져 있으면 키챌 정보도 12시간 이상 지난 경우 화면에 들어올 때 확인합니다.</p></div><a class="button button-light" href="#accountView">블로그 연결·설정 ↗</a></div>
+  $('blogAnalysisView').innerHTML=`<div class="work-heading"><div><p class="eyebrow">YOUR BLOG · AT A GLANCE</p><h1>내 블로그 분석</h1><p class="muted">로그인할 때 새 글을 한 번 자동으로 가져옵니다. 이후에는 아래 버튼으로 새 글과 키챌 정보를 갱신할 수 있습니다.</p></div><a class="button button-light" href="#accountView">블로그 연결·설정 ↗</a></div>
     <div id="analysisLoading" class="analysis-loading" role="status" hidden></div>
     <div id="analysisProfileRefresh" class="analysis-loading" role="status" aria-live="polite" hidden></div>
     <p id="analysisMessage" class="message" role="status"></p>
     <div id="analysisContent" hidden>
-      <section class="panel work-panel analysis-connection"><div class="analysis-collection-info"><div id="analysisIdentity" class="work-identity"></div><p id="analysisUpdated" class="muted small"></p><p class="muted small">로그인할 때 새 글을 자동으로 가져옵니다. 이 화면을 열거나 새로고침해도 갱신됩니다.</p><p id="analysisSearchStatus" class="muted small" role="status"></p></div><div class="analysis-check-actions"><p id="analysisSearchSummary" class="small" aria-live="polite"></p><button id="blogCheckSearch" class="button">검색 노출 점검</button><small class="muted">최근 글 최대 20개 · 한국시간 자정 초기화</small></div></section>
+      <section class="panel work-panel analysis-connection"><div class="analysis-collection-info"><div id="analysisIdentity" class="work-identity"></div><p id="analysisUpdated" class="muted small"></p><p class="muted small">로그인할 때 새 글을 자동으로 가져옵니다. 이 화면을 열거나 새로고침해도 갱신됩니다.</p><p id="analysisSearchStatus" class="muted small" role="status"></p></div><div class="analysis-check-actions"><p id="analysisSearchSummary" class="small" aria-live="polite"></p><button id="blogRefreshData" class="button button-light" type="button">새 글·키챌 정보 갱신</button><button id="blogCheckSearch" class="button">검색 노출 점검</button><small class="muted">최근 글 최대 20개 · 한국시간 자정 초기화</small></div></section>
       <div id="analysisNotice" class="analysis-note" role="status"></div>
       <div class="strategy-stats work-stats"><div class="panel metric"><span>수집한 글</span><strong id="analysisTotal">—</strong><small>연결 후 누적한 공개 글</small></div><div class="panel metric metric-green"><span>노출 확인</span><strong id="analysisFound">—</strong><small>최근 수집 글 최대 20개 기준</small></div><div class="panel metric metric-purple"><span>검색 재확인 필요</span><strong id="analysisUnconfirmed">—</strong><small>조회 범위에서 찾지 못한 글</small></div><div class="panel metric"><span>오늘 발견한 글</span><strong id="analysisNew">—</strong><small>발행일과 관계없이 첫 수집 기준</small></div></div>
       <div class="work-two-columns"><section class="panel work-panel"><div class="work-section-title"><h2>블로그 활동 흐름</h2><span class="count-chip">최근 4주</span></div><div id="analysisActivity"></div><p class="muted small">월요일~일요일(한국시간) 기준이며, 이번 주는 오늘까지 집계합니다. 수집된 글의 발행일 기준으로, 과거 글 전체 통계는 아닙니다.</p></section><section class="panel work-panel"><h2>오늘의 확인 사항</h2><div id="analysisTasks"></div><a class="analysis-keyword-link" href="#keywordSearchView">다음 글의 키워드 검색하기 ↗</a></section></div>
@@ -122,6 +122,28 @@ export function createBlogAnalysis(client, getProfile = () => '') {
     }catch{failed=true;}
     finally{if(g===epoch){refreshing=false;await load();if(failed&&visible)message('새 글 수집을 요청하지 못했습니다. 기존 글은 확인할 수 있습니다. 잠시 후 새로고침해 주세요.',true);}}
   }
+  async function refreshAll(){
+    if(!user||refreshing)return;
+    const button=$('blogRefreshData');
+    button.disabled=true;
+    button.textContent='새 글·키챌 갱신 중…';
+    try{
+      await refreshPosts();
+      const influencerId=getProfile();
+      if(influencerId){
+        setProfileRefreshStatus('키챌 참여 정보를 갱신하고 있습니다…');
+        const succeeded=await refreshProfile(influencerId);
+        if(succeeded){
+          setProfileRefreshStatus('새 글과 키챌 참여 정보를 갱신했습니다.');
+          await load();
+        }else setProfileRefreshStatus('키챌 정보를 갱신하지 못했습니다. 기존 자료는 유지됩니다.',true);
+      }
+    }finally{
+      button.disabled=false;
+      button.textContent='새 글·키챌 정보 갱신';
+    }
+  }
+  $('blogRefreshData').addEventListener('click',()=>void refreshAll());
   async function requestSearch(){
     if(!user||busy)return;const g=epoch;busy=true;let feedback='',failed=false;
     $('blogCheckSearch').disabled=true;
@@ -191,5 +213,5 @@ export function createBlogAnalysis(client, getProfile = () => '') {
   $('blogApiForm').addEventListener('submit',e=>{e.preventDefault();void saveConnection('save');});
   $('blogApiPause').addEventListener('click',()=>void saveConnection('pause'));
   $('blogApiConfirm').addEventListener('click',()=>void saveConnection('confirm'));
-  return {refresh(){if(visible)return load();},setProfileRefreshStatus(text,error=false){const node=$('analysisProfileRefresh');clearTimeout(profileRefreshTimer);node.hidden=!text;node.textContent=text||'';node.className=error?'message error':'analysis-loading';if(text&&!error&&!text.includes('갱신하고 있습니다'))profileRefreshTimer=setTimeout(()=>{node.hidden=true;},8000);},setUser(next){if(user?.id===next?.id)return;clearTimeout(profileRefreshTimer);$('analysisProfileRefresh').hidden=true;retrying=false;$('analysisLoading').hidden=true;user=next;epoch++;version++;connectionVersion++;canManageApi=false;admin.hidden=true;for(const id of ['blogApiSetupIntro','blogApiForm','blogApiActions','blogApiMessage'])$(id).hidden=true;page=1;busy=false;refreshing=false;metricsBusy=false;metricsRequests.clear();clearTimeout(pollTimer);clearTimeout(filterTimer);$('analysisContent').hidden=true;$('analysisQuery').value='';$('analysisFilter').value='';$('blogApiForm').reset();$('blogApiMessage').textContent='';$('blogApiSave').disabled=false;$('blogApiPause').disabled=false;$('blogApiConfirm').disabled=false;$('blogApiUsage').textContent='';message('');if(user){void connection();void refreshPosts();}},show(name){const wasVisible=visible;visible=name==='blogAnalysisView';if(visible){if(wasVisible)void load();else void refreshPosts();}else clearTimeout(pollTimer);if(name==='catalogAdmin')void connection(true);}};
+  return {refresh(){if(visible)return load();},setProfileRefreshStatus(text,error=false){const node=$('analysisProfileRefresh');clearTimeout(profileRefreshTimer);node.hidden=!text;node.textContent=text||'';node.className=error?'message error':'analysis-loading';if(text&&!error&&!text.includes('갱신하고 있습니다'))profileRefreshTimer=setTimeout(()=>{node.hidden=true;},8000);},setUser(next){if(user?.id===next?.id)return;clearTimeout(profileRefreshTimer);$('analysisProfileRefresh').hidden=true;retrying=false;$('analysisLoading').hidden=true;user=next;epoch++;version++;connectionVersion++;canManageApi=false;admin.hidden=true;for(const id of ['blogApiSetupIntro','blogApiForm','blogApiActions','blogApiMessage'])$(id).hidden=true;page=1;busy=false;refreshing=false;metricsBusy=false;metricsRequests.clear();clearTimeout(pollTimer);clearTimeout(filterTimer);$('analysisContent').hidden=true;$('analysisQuery').value='';$('analysisFilter').value='';$('blogApiForm').reset();$('blogApiMessage').textContent='';$('blogApiSave').disabled=false;$('blogApiPause').disabled=false;$('blogApiConfirm').disabled=false;$('blogApiUsage').textContent='';message('');if(user){void connection();void refreshPosts();}},show(name){const wasVisible=visible;visible=name==='blogAnalysisView';if(visible)void load();else clearTimeout(pollTimer);if(name==='catalogAdmin')void connection(true);}};
 }
