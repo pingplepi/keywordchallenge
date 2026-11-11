@@ -18,6 +18,7 @@ export function createStrategy(client, {getInterest=()=>null}={}) {
     <div class="strategy-heading"><div><p class="eyebrow">YOUR DAILY KEYWORD BRIEF</p><h1>키온 대시보드</h1><p id="strategySubtitle" class="muted">오늘 집중할 키워드를 한눈에 확인하세요.</p></div><a id="strategyManageLink" class="button button-light" href="#accountView" hidden>내 설정 관리 ↗</a></div>
     <div id="strategyEmpty" class="panel strategy-welcome" aria-live="polite" aria-busy="true"><h2 id="strategyWelcomeTitle">연결 정보를 불러오고 있어요.</h2><p id="strategyWelcomeDescription" class="muted">잠시만 기다려 주세요.</p><a id="strategyConnect" class="button" href="#accountView" hidden>인플홈 연결하기</a><button id="strategyRetry" class="button" hidden>다시 불러오기</button><p id="strategyWelcomeNote" class="muted small" hidden>처음 한 번 연결하면 다음 로그인부터 내 대시보드가 바로 열립니다.</p></div>
     <div id="strategyContent" hidden>
+      <div id="strategyLoading" class="analysis-loading" role="status" aria-live="polite" hidden></div>
       <div class="strategy-context"><div><span id="strategyProfile" class="profile-chip"></span><span id="strategyDate" class="muted small"></span></div><div class="strategy-controls"><label>분야<select id="strategyField"><option value="">모든 분야</option></select></label><button id="strategyRefresh" class="button button-quiet">새로고침</button></div></div>
       <p id="strategyError" class="message error" role="status" hidden></p>
       <div class="strategy-stats">
@@ -75,15 +76,20 @@ export function createStrategy(client, {getInterest=()=>null}={}) {
   }
   async function refresh() {
     if(!profile||!user)return;
-    const v=++version, id=profile.influencerId;
+    const v=++version, id=profile.influencerId, hadData=!!data;
+    const loading=$('strategyLoading');
+    loading.textContent=hadData?'대시보드를 갱신하는 중입니다…':'대시보드를 불러오는 중입니다…';
+    loading.hidden=false;$('strategyContent').setAttribute('aria-busy','true');
     $('strategyError').hidden=true;$('strategyRefresh').disabled=true;
     void opportunities.load($('strategyField').value);
     try{
       const {data:response,error}=await client.rpc('keychallenge_strategy',{p_influencer_id:id,p_field:$('strategyField').value});
       if(v!==version)return;if(error)throw error;
+      loading.hidden=true;$('strategyContent').setAttribute('aria-busy','false');
       data=response;render();$('detailField').value=data.field;page=1;
       if($('strategyDetails').open)await search();
     }catch(error){if(v===version){
+      loading.hidden=true;$('strategyContent').setAttribute('aria-busy','false');
       $('strategyError').textContent=error.code==='57014'||/statement timeout/i.test(error.message||'')
         ?'대시보드 조회가 지연되고 있습니다. 잠시 후 새로고침을 눌러 주세요.'
         :`대시보드를 불러오지 못했습니다: ${error.message}`;
