@@ -30,6 +30,7 @@ let refreshSchedule = null;
 let refreshViewVersion = 0;
 let activeVisitId = null;
 let activeVisitUserId = null;
+const profileAutoRefreshes = new Set();
 const memberVisitStorageKey = 'keyon.member.visit';
 
 function createMemberVisitId() {
@@ -204,6 +205,7 @@ async function saveProfile(payload) {
   activeId = id;
   renderTabs();
   setActive(id);
+  void blogAnalysis?.refresh();
   if (firstConnection) window.location.replace('#strategyView');
 }
 
@@ -226,6 +228,7 @@ function setActive(id) {
   void renderRefreshSettings();
   void catalog?.setContext(session?.user || null, profiles.get(activeId));
   void strategy?.setContext(session?.user || null, profiles.get(activeId));
+  if (document.body.dataset.page === 'blogAnalysisView') void maybeRefreshProfileFromBlogAnalysis();
 }
 
 const koreanTime = (value) => new Date(value).toLocaleString('ko-KR', {
@@ -276,6 +279,53 @@ async function toggleAutoRefresh() {
   if (error) notify('예약 설정을 저장하지 못했습니다. 잠시 후 다시 시도해 주세요.', true);
   else notify(`${id}의 매일 자동 갱신을 ${enabled ? '켰습니다' : '껐습니다'}.`);
   await renderRefreshSettings();
+}
+
+const blogAnalysisProfileMaxAge = 12 * 60 * 60 * 1000;
+const blogAnalysisRefreshKey = (userId,id) => `keyon.blog-profile-refresh:${userId}:${id}`;
+
+async function maybeRefreshProfileFromBlogAnalysis() {
+  const userId = session?.user.id;
+  const id = activeId;
+  const payload = profiles.get(id);
+  if (!userId || !id || !payload || document.body.dataset.page !== 'blogAnalysisView'
+      || collectionController || !refreshSchedule?.enabled) return false;
+  const collectedAt = Date.parse(payload.collectedAt || '');
+  if (Number.isFinite(collectedAt) && Date.now() - collectedAt < blogAnalysisProfileMaxAge) return false;
+  const key = `${userId}:${id}`;
+  if (profileAutoRefreshes.has(key)) return false;
+  const storageKey = blogAnalysisRefreshKey(userId,id);
+  let lastAttempt = null;
+  try { lastAttempt = JSON.parse(localStorage.getItem(storageKey) || 'null'); } catch { /* Use the in-memory guard when storage is unavailable. */ }
+  if (lastAttempt && Number.isFinite(Number(lastAttempt.at))) {
+    const cooldown = lastAttempt.state === 'succeeded' ? blogAnalysisProfileMaxAge
+      : lastAttempt.state === 'running' ? 60 * 60 * 1000 : 30 * 60 * 1000;
+    if (Date.now() - Number(lastAttempt.at) < cooldown) return false;
+  }
+  const {data:setting,error} = await supabase.from('keychallenge_profiles')
+    .select('auto_refresh_enabled').eq('user_id',userId).eq('influencer_id',id).maybeSingle();
+  if (session?.user.id !== userId || activeId !== id || error || !setting?.auto_refresh_enabled
+      || collectionController) return false;
+  const latestCollectedAt = Date.parse(profiles.get(id)?.collectedAt || '');
+  if (Number.isFinite(latestCollectedAt) && Date.now() - latestCollectedAt < blogAnalysisProfileMaxAge) return false;
+  profileAutoRefreshes.add(key);
+  try { localStorage.setItem(storageKey, JSON.stringify({at:Date.now(),state:'running'})); } catch { /* Continue without persistent cooldown. */ }
+  blogAnalysis?.setProfileRefreshStatus('키챌 참여 정보를 자동 갱신하고 있습니다…');
+  try {
+    const succeeded = await startCollection({automatic:true});
+    if (session?.user.id !== userId) return false;
+    if (succeeded) {
+      try { localStorage.setItem(storageKey, JSON.stringify({at:Date.now(),state:'succeeded'})); } catch { /* Ignore unavailable storage. */ }
+      blogAnalysis?.setProfileRefreshStatus('키챌 참여 정보를 갱신했습니다.');
+      void blogAnalysis?.refresh();
+      return true;
+    }
+    try { localStorage.setItem(storageKey, JSON.stringify({at:Date.now(),state:'failed'})); } catch { /* Ignore unavailable storage. */ }
+    blogAnalysis?.setProfileRefreshStatus('키챌 자동 갱신을 완료하지 못했습니다. 기존 자료는 유지됩니다. 인플홈 연결·갱신에서 다시 시도해 주세요.',true);
+    return false;
+  } finally {
+    profileAutoRefreshes.delete(key);
+  }
 }
 
 function rankIsValid(value) { return value !== null && value !== '' && Number.isFinite(Number(value)) && Number(value) > 0; }
@@ -342,18 +392,20 @@ async function collectPage(influencerId, cursor, signal) {
   return result;
 }
 
-async function startCollection() {
-  if (collectionController) return;
-  if (!session) return notify('로그인 후 수집해 주세요.', true);
+async function startCollection({automatic=false}={}) {
+  if (collectionController) return false;
+  if (!session) { if (!automatic) notify('로그인 후 수집해 주세요.', true); return false; }
   const id = normalizeId(byId('influencerInput').value).toLowerCase();
   if (!/^[a-z0-9][a-z0-9_.-]{0,99}$/.test(id)) {
-    return notify('올바른 네이버 인플루언서 ID 또는 인플홈 주소를 입력해 주세요.', true);
+    if (!automatic) notify('올바른 네이버 인플루언서 ID 또는 인플홈 주소를 입력해 주세요.', true);
+    return false;
   }
+  let succeeded = false;
   const controller = new AbortController();
   const userId = session.user.id;
   collectionController = controller;
   byId('collectButton').disabled = true;
-  byId('collectButton').textContent = '자동 수집 중…';
+  byId('collectButton').textContent = automatic ? '자동 갱신 중…' : '자동 수집 중…';
   byId('influencerInput').disabled = true;
   byId('collectorGuide').hidden = false;
   byId('cancelCollectionButton').hidden = false;
@@ -408,13 +460,14 @@ async function startCollection() {
     byId('collectionProgress').value = Math.max(total, 1);
     byId('collectorStatus').textContent = '자동 수집 완료';
     byId('collectionProgressText').textContent = `${total.toLocaleString()}개 키워드가 저장되었습니다. 전체 목록에서 내 참여 여부를 비교할 수 있습니다.`;
-    notify(`${id}의 키워드 ${total.toLocaleString()}개를 자동 수집해 저장했습니다.`);
+    succeeded = true;
+    if (!automatic) notify(`${id}의 키워드 ${total.toLocaleString()}개를 자동 수집해 저장했습니다.`);
   } catch (error) {
     if (session?.user.id === userId) {
       const cancelled = controller.signal.aborted || error.name === 'AbortError';
       byId('collectorStatus').textContent = cancelled ? '수집 취소됨' : '수집을 완료하지 못했습니다';
       byId('collectionProgressText').textContent = '이전에 저장한 데이터는 그대로 유지됩니다.';
-      notify(cancelled ? '수집을 취소했습니다.' : error.message, !cancelled);
+      if (!automatic) notify(cancelled ? '수집을 취소했습니다.' : error.message, !cancelled);
     }
   } finally {
     if (collectionController === controller) {
@@ -425,6 +478,7 @@ async function startCollection() {
       byId('cancelCollectionButton').hidden = true;
     }
   }
+  return succeeded;
 }
 
 function exportBackup() {
@@ -604,6 +658,7 @@ function showPage() {
   workspace?.show(page);
   strategy?.show(page);
   blogAnalysis?.show(page);
+  if (page === 'blogAnalysisView') void maybeRefreshProfileFromBlogAnalysis();
   membership?.show(page);
   collaboration?.show(page);
 }
