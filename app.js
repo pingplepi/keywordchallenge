@@ -164,6 +164,7 @@ async function onSessionChanged(nextSession, authEvent = 'restore') {
   await workspace?.setUser(session.user);
   if (version !== sessionVersion) return;
   await loadProfiles(version);
+  if (version === sessionVersion && changedUser) void maybeRefreshProfileOnLogin();
 }
 
 async function loadProfiles(version = sessionVersion) {
@@ -228,7 +229,6 @@ function setActive(id) {
   void renderRefreshSettings();
   void catalog?.setContext(session?.user || null, profiles.get(activeId));
   void strategy?.setContext(session?.user || null, profiles.get(activeId));
-  if (document.body.dataset.page === 'blogAnalysisView') void maybeRefreshProfileFromBlogAnalysis();
 }
 
 const koreanTime = (value) => new Date(value).toLocaleString('ko-KR', {
@@ -284,12 +284,11 @@ async function toggleAutoRefresh() {
 const blogAnalysisProfileMaxAge = 12 * 60 * 60 * 1000;
 const blogAnalysisRefreshKey = (userId,id) => `keyon.blog-profile-refresh:${userId}:${id}`;
 
-async function maybeRefreshProfileFromBlogAnalysis() {
+async function maybeRefreshProfileOnLogin() {
   const userId = session?.user.id;
   const id = activeId;
   const payload = profiles.get(id);
-  if (!userId || !id || !payload || document.body.dataset.page !== 'blogAnalysisView'
-      || collectionController || !refreshSchedule?.enabled) return false;
+  if (!userId || !id || !payload || collectionController || !refreshSchedule?.enabled) return false;
   const collectedAt = Date.parse(payload.collectedAt || '');
   if (Number.isFinite(collectedAt) && Date.now() - collectedAt < blogAnalysisProfileMaxAge) return false;
   const key = `${userId}:${id}`;
@@ -570,7 +569,10 @@ async function initialize() {
   catalog = createCatalog(supabase);
   strategy = createStrategy(supabase, {getInterest:()=>member?.interest});
   membership = createMembershipManager(supabase);
-  blogAnalysis = createBlogAnalysis(supabase, () => activeId);
+  blogAnalysis = createBlogAnalysis(supabase, () => activeId, async influencerId => {
+    if (!influencerId || influencerId !== activeId || !profiles.has(influencerId)) return false;
+    return startCollection();
+  });
   collaboration = createCollaborationManager(supabase);
   workspace = createBloggerWorkspace(supabase, { onMemberChange(next, ready = true) {
     member = next; memberReady = ready;
@@ -658,7 +660,6 @@ function showPage() {
   workspace?.show(page);
   strategy?.show(page);
   blogAnalysis?.show(page);
-  if (page === 'blogAnalysisView') void maybeRefreshProfileFromBlogAnalysis();
   membership?.show(page);
   collaboration?.show(page);
 }
