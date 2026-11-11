@@ -141,6 +141,8 @@ export function createStrategy(client, {getInterest=()=>null}={}) {
     const context=++contextVersion;
     const nextPreferredField=defaultDashboardField(getInterest());
     const changed=profile?.influencerId!==nextProfile?.influencerId||user?.id!==nextUser?.id||preferredField!==nextPreferredField;
+    const sameContext=!changed&&profile===nextProfile;
+    if(sameContext&&nextProfile&&!loading&&!loadError)return;
     preferredField=nextPreferredField;
     user=nextUser;profile=nextProfile;version++;searchVersion++;detailVersion++;
     opportunities.setContext(user,profile);
