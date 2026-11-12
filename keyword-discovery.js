@@ -106,7 +106,11 @@ export function createTopicDiscovery(client,{root,onSaved=()=>{}}){
   nav.addEventListener('keydown',e=>{if(!['ArrowLeft','ArrowRight','Home','End'].includes(e.key))return;e.preventDefault();const i=methods.findIndex(([id])=>id===tab);const next=e.key==='Home'?0:e.key==='End'?methods.length-1:(i+(e.key==='ArrowRight'?1:-1)+methods.length)%methods.length;choose(methods[next][0],true);});
   document.addEventListener('click',e=>{const link=e.target.closest('[data-keyword-discovery-target]');if(link)choose(link.dataset.keywordDiscoveryTarget);});
   choose('personal');
-  function seeds(){ $('[data-topic-seeds]').value=topics[$('[data-topic-field]').value].join(', '); }
+  function seeds(){
+    const input=$('[data-topic-seeds]');
+    const examples=topics[$('[data-topic-field]').value]||[];
+    input.placeholder=examples.length?'예: '+examples.join(', '):'예: 원하는 키워드를 입력해 주세요';
+  }
   $('[data-topic-field]').addEventListener('change',seeds);seeds();
   function render(){
     const filter=key($('[data-topic-filter]').value),prefer=$('[data-topic-new]').checked;
@@ -139,7 +143,7 @@ export function createTopicDiscovery(client,{root,onSaved=()=>{}}){
     finally{if(g===epoch&&v===sequence)$('[data-topic-submit]').disabled=false;}
   });
   panel.addEventListener('click',async e=>{const b=e.target.closest('[data-topic-save]');if(!b||b.disabled||!user)return;const row=all.find(r=>r.keyword_key===b.dataset.topicSave);if(!row)return;const g=epoch;b.disabled=true;try{const result=await client.rpc('keychallenge_save_blog_keyword',{p_keyword:row.keyword});if(g!==epoch)return;if(result.error)throw result.error;saved.add(row.keyword_key);render();onSaved();}catch(error){if(g===epoch){b.disabled=false;$('[data-topic-status]').textContent=error.message||'보관하지 못했습니다.';}}});
-  return {direct:()=>choose('direct'),show(page){visible=page==='keywordSearchView';sync();},setContext(next,nextSettings){clearDraft();titleInput.value='';epoch++;sequence++;controller?.abort();user=next;settings=nextSettings;all=[];titles=[];postCount=0;saved.clear();$('[data-topic-result]').hidden=true;$('[data-topic-submit]').disabled=false;$('[data-topic-status]').textContent='주제를 선택한 뒤 버튼을 눌러 주세요.';$('[data-topic-field]').value=Object.hasOwn(topics,normalizeInterestField(settings?.interest))?normalizeInterestField(settings.interest):'여행';seeds();choose('personal');}};
+  return {direct:()=>choose('direct'),show(page){visible=page==='keywordSearchView';sync();},setContext(next,nextSettings){clearDraft();titleInput.value='';epoch++;sequence++;controller?.abort();user=next;settings=nextSettings;all=[];titles=[];postCount=0;saved.clear();$('[data-topic-result]').hidden=true;$('[data-topic-submit]').disabled=false;$('[data-topic-status]').textContent='주제를 선택한 뒤 버튼을 눌러 주세요.';$('[data-topic-field]').value=Object.hasOwn(topics,normalizeInterestField(settings?.interest))?normalizeInterestField(settings.interest):'여행';$('[data-topic-seeds]').value='';seeds();choose('personal');}};
 }
 export function createPersonalKeywords(client,{root,onSaved=()=>{}}){
   let user=null,profile=null,epoch=0,request=0,data=null,loading=false,loadedAt=0,seenKeys=[],previousBatches=[],viewingPrevious=false,savingKey=null,pendingRefill=null;const saved=new Set();
