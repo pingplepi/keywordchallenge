@@ -139,7 +139,7 @@
         <div id="notice" class="notice" role="status" hidden></div>
         <section class="panel collect-panel">
           <div class="collect-form"><div class="input-grow"><label for="influencerInput">인플루언서 ID 또는 인플홈 주소</label><input id="influencerInput" placeholder="본인의 in.naver.com/아이디 주소를 입력하세요" /></div><button id="collectButton" class="button" type="button">인플홈 연결·갱신</button></div>
-          <div class="subtle">처음에는 주소를 입력하고 수집해 주세요. 저장한 인플홈은 매일 오전 4시(한국시간)부터 자동 갱신됩니다. 지금 수집하는 동안에는 이 화면을 열어 두세요.</div>
+          <div class="subtle">처음에는 주소를 입력하고 수집해 주세요. 저장한 인플홈은 로그인할 때 최근 수집 후 6시간이 지난 경우 자동 갱신됩니다. 직접 갱신할 수도 있습니다.</div>
           <div id="collectorGuide" class="collector-guide" hidden>
             <div class="guide-head"><div><strong>공개 데이터 자동 수집</strong><p class="muted">전체 목록을 가져온 뒤 참여 여부와 순위를 업데이트합니다.</p></div><span id="collectorStatus" class="status-pill" role="status" aria-live="polite">대기 중</span></div>
             <progress id="collectionProgress" class="collection-progress" max="1" value="0" aria-label="키워드 수집 진행률"></progress>
@@ -150,11 +150,9 @@
         <div class="toolbar"><div id="profileTabs" class="profile-tabs"></div><div class="toolbar-actions"><label class="button button-light file-button">JSON 가져오기<input id="importInput" type="file" accept="application/json,.json" multiple /></label><button id="exportButton" class="button button-light" type="button">내 데이터 내보내기</button></div></div>
 
         <section id="dashboard" hidden>
-          <section id="refreshSettings" class="panel refresh-settings" hidden>
-            <div class="refresh-heading"><div><p class="eyebrow">DAILY REFRESH</p><h2>키워드 챌린지 자동 갱신</h2></div><span id="refreshBadge" class="status-pill"></span></div>
-            <label class="refresh-toggle"><input id="autoRefreshToggle" type="checkbox" />매일 오전 4시 자동 갱신</label>
-            <p class="muted small">일별 순위 변화를 기록하기 위해 참여 키워드와 순위를 매일 갱신합니다. 블로그 글은 로그인 시 수집됩니다.</p>
-            <p id="refreshNext" class="small"></p><p id="refreshLast" class="muted small"></p><p id="refreshStatus" class="message" role="status"></p>
+          <section class="panel refresh-settings">
+            <div class="refresh-heading"><div><p class="eyebrow">LOGIN REFRESH</p><h2>키워드 챌린지 자동 갱신</h2></div><span class="status-pill">회원 공통</span></div>
+            <p class="muted small">로그인하면 저장된 키챌 정보를 먼저 보여드리고, 마지막 수집 후 6시간이 지난 경우 백그라운드에서 자동 갱신합니다. 화면을 기다리지 않아도 되며, 기존 자료는 갱신이 끝날 때까지 유지됩니다.</p>
           </section>
           <details class="influencer-data-details"><summary>수집한 키워드 상세 보기</summary>
           <div class="stats"><article class="panel stat"><span>분석 대상</span><strong id="statId">-</strong></article><article class="panel stat"><span>참여 키워드</span><strong id="statTotal">-</strong></article><article class="panel stat"><span>TOP 3</span><strong id="statTop3">-</strong></article><article class="panel stat"><span>순위 확인</span><strong id="statRanked">-</strong></article></div>
