@@ -229,6 +229,8 @@ function setActive(id) {
   void renderRefreshSettings();
   void catalog?.setContext(session?.user || null, profiles.get(activeId));
   void strategy?.setContext(session?.user || null, profiles.get(activeId));
+  if(document.body.dataset.page==='blogAnalysisView') void blogAnalysis?.refresh();
+  else if(document.body.dataset.page==='strategyView'||document.body.dataset.page==='bloggerView') blogAnalysis?.prefetchDashboard();
 }
 
 const koreanTime = (value) => new Date(value).toLocaleString('ko-KR', {
