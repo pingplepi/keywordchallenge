@@ -88,8 +88,10 @@ export function createBlogAnalysis(client, getProfile = () => '', refreshProfile
     if(!user||!visible)return;const g=epoch,v=++version;clearTimeout(pollTimer);
     const loading=$('analysisLoading');
     message('');
-    loading.hidden=false;
-    loading.textContent=retrying?'블로그 분석을 다시 불러오는 중입니다…':$('analysisContent').hidden?'블로그 분석을 불러오는 중입니다…':'블로그 분석을 갱신하는 중입니다…';
+    if($('analysisContent').hidden){
+      loading.hidden=false;
+      loading.textContent=retrying?'블로그 분석을 다시 불러오는 중입니다…':'블로그 분석을 불러오는 중입니다…';
+    }else loading.hidden=true;
     try{
       const {data,error}=await dashboardData(force);
       if(error)throw error;if(g!==epoch||v!==version)return;
@@ -123,7 +125,14 @@ export function createBlogAnalysis(client, getProfile = () => '', refreshProfile
       const nextWake=[Date.parse(data.daily_check_reset_at),m.status==='queued'?Date.parse(m.next_attempt_at):0].filter(t=>t>Date.now());
       schedule(data.items.some(item=>item.body_metrics_status==='queued')||searchActive||m.status==='running'||(m.status==='queued'&&Date.parse(m.next_attempt_at)<=Date.now()+60000),nextWake.length?Math.min(...nextWake):0);
       void requestBodyMetrics(data.items,g);
-    }catch(error){if(g===epoch&&v===version){retrying=true;loading.hidden=false;loading.textContent='조회가 지연되어 잠시 후 자동으로 다시 시도합니다.';schedule(true);}}
+    }catch(error){
+      if(g===epoch&&v===version){
+        retrying=true;
+        if($('analysisContent').hidden){loading.hidden=false;loading.textContent='조회가 지연되어 잠시 후 자동으로 다시 시도합니다.';}
+        else{loading.hidden=true;message('분석 정보 갱신이 지연되고 있어요. 기존 결과는 계속 표시됩니다.',true);}
+        schedule(true);
+      }
+    }
   }
   async function refreshPosts(){
     if(!user||refreshing)return;
