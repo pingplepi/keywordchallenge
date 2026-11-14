@@ -10,17 +10,31 @@ export function createBlogAnalysis(client, getProfile = () => '', refreshProfile
   let user=null,epoch=0,version=0,connectionVersion=0,page=1,visible=false,pollTimer,filterTimer,busy=false,refreshing=false,canManageApi=false;
   let retrying=false,profileRefreshTimer;
   let metricsBusy=false; const metricsRequests=new Map();
+  let dashboardCacheKey='',dashboardCacheAt=0,dashboardCacheData=null,dashboardFlight=null,dashboardFlightKey='',dashboardGeneration=0;
+  function dashboardKey(){return JSON.stringify([user?.id||'',getProfile(),$('analysisQuery').value.trim(),$('analysisFilter').value,page]);}
+  function invalidateDashboard(){dashboardCacheKey='';dashboardCacheAt=0;dashboardCacheData=null;dashboardGeneration++;dashboardFlight=null;dashboardFlightKey='';}
+  function dashboardData(force=false){
+    const key=dashboardKey(),uid=user?.id,generation=dashboardGeneration;
+    if(!force&&dashboardCacheKey===key&&Date.now()-dashboardCacheAt<60000)return Promise.resolve({data:dashboardCacheData,error:null});
+    if(dashboardFlight&&dashboardFlightKey===key)return dashboardFlight;
+    const request=client.rpc('keychallenge_blog_title_dashboard',{p_review:false,p_profile:getProfile(),p_query:$('analysisQuery').value.trim(),p_status:$('analysisFilter').value,p_page:page}).then(result=>{
+      if(!result.error&&user?.id===uid&&generation===dashboardGeneration&&key===dashboardKey()){dashboardCacheKey=key;dashboardCacheAt=Date.now();dashboardCacheData=result.data;}
+      return result;
+    }).finally(()=>{if(dashboardFlight===request){dashboardFlight=null;dashboardFlightKey='';}});
+    dashboardFlightKey=key;dashboardFlight=request;return request;
+  }
+  function prefetchDashboard(force=false){if(!user||!getProfile()||refreshing)return;void dashboardData(force).catch(()=>{});}
   $('blogAnalysisView').innerHTML=`<div class="work-heading"><div><p class="eyebrow">YOUR BLOG · AT A GLANCE</p><h1>내 블로그 분석</h1><p class="muted">로그인할 때 새 글을 한 번 자동으로 가져옵니다. 이후에는 아래 버튼으로 새 글과 키챌 정보를 갱신할 수 있습니다.</p></div><a class="button button-light" href="#accountView">블로그 연결·설정 ↗</a></div>
     <div id="analysisLoading" class="analysis-loading" role="status" hidden></div>
     <div id="analysisProfileRefresh" class="analysis-loading" role="status" aria-live="polite" hidden></div>
     <p id="analysisMessage" class="message" role="status"></p>
     <div id="analysisContent" hidden>
-      <section class="panel work-panel analysis-connection"><div class="analysis-collection-info"><div id="analysisIdentity" class="work-identity"></div><p id="analysisUpdated" class="muted small"></p><p class="muted small">로그인할 때 새 글을 자동으로 가져옵니다. 이 화면을 열거나 새로고침해도 갱신됩니다.</p><p id="analysisSearchStatus" class="muted small" role="status"></p></div><div class="analysis-check-actions"><p id="analysisSearchSummary" class="small" aria-live="polite"></p><button id="blogRefreshData" class="button button-light" type="button">새 글·키챌 정보 갱신</button><button id="blogCheckSearch" class="button">검색 노출 점검</button><small class="muted">최근 글 최대 20개 · 한국시간 자정 초기화</small></div></section>
+      <section class="panel work-panel analysis-connection"><div class="analysis-collection-info"><div id="analysisIdentity" class="work-identity"></div><p id="analysisUpdated" class="muted small"></p><p class="muted small">로그인 시 새 글을 자동 수집하고, 대시보드에서 분석 정보를 미리 불러옵니다. 필요하면 버튼으로 다시 갱신할 수 있습니다.</p><p id="analysisSearchStatus" class="muted small" role="status"></p></div><div class="analysis-check-actions"><p id="analysisSearchSummary" class="small" aria-live="polite"></p><button id="blogRefreshData" class="button button-light" type="button">새 글·키챌 정보 갱신</button><button id="blogCheckSearch" class="button">검색 노출 점검</button><small class="muted">최근 글 최대 20개 · 한국시간 자정 초기화</small></div></section>
       <div id="analysisNotice" class="analysis-note" role="status"></div>
       <div class="strategy-stats work-stats"><div class="panel metric"><span>수집한 글</span><strong id="analysisTotal">—</strong><small>연결 후 누적한 공개 글</small></div><div class="panel metric metric-green"><span>노출 확인</span><strong id="analysisFound">—</strong><small>최근 수집 글 최대 20개 기준</small></div><div class="panel metric metric-purple"><span>검색 재확인 필요</span><strong id="analysisUnconfirmed">—</strong><small>조회 범위에서 찾지 못한 글</small></div><div class="panel metric"><span>오늘 발견한 글</span><strong id="analysisNew">—</strong><small>발행일과 관계없이 첫 수집 기준</small></div></div>
       <div class="work-two-columns"><section class="panel work-panel"><div class="work-section-title"><h2>블로그 활동 흐름</h2><span class="count-chip">최근 4주</span></div><div id="analysisActivity"></div><p class="muted small">월요일~일요일(한국시간) 기준이며, 이번 주는 오늘까지 집계합니다. 수집된 글의 발행일 기준으로, 과거 글 전체 통계는 아닙니다.</p></section><section class="panel work-panel"><h2>오늘의 확인 사항</h2><div id="analysisTasks"></div><a class="analysis-keyword-link" href="#keywordSearchView">다음 글의 키워드 검색하기 ↗</a></section></div>
       <section class="panel work-panel"><div class="work-section-title"><h2>수집한 글과 검색 노출</h2><span id="analysisCount" class="muted small" aria-live="polite"></span></div><div class="work-filters analysis-filters"><label>글 제목 검색<input id="analysisQuery" type="search" maxlength="100" placeholder="수집된 글 제목에서 찾기" /></label><label>확인 상태<select id="analysisFilter"><option value="">전체</option><option value="found">노출 확인</option><option value="unconfirmed">노출 미확인</option><option value="pending">검색 대기</option><option value="error">검색 오류</option></select></label></div><p class="muted small">본문 글자 수·이미지 수는 화면에 보이는 글부터 자동 집계합니다. 집계에 몇 분 걸릴 수 있으며 정상 결과는 24시간 동안 재사용합니다. 검색 API 한도와 점검 횟수는 사용하지 않습니다.</p><p id="analysisMetricsMessage" class="muted small" role="status"></p><div id="analysisRows"></div><div class="pagination"><button id="analysisPrev" class="button button-light">이전</button><span id="analysisPage"></span><button id="analysisNext" class="button button-light">다음</button></div>
-      <details class="analysis-method"><summary>수집 범위와 노출 확인 기준</summary><p>본문 통계는 공개된 글의 일반 텍스트·인용문·표·사진 설명과 본문 사진을 기준으로 합니다. 제목·댓글·프로필·광고·링크 미리보기·지도·수식·스티커·동영상은 제외합니다. 연속 공백과 줄바꿈은 공백 한 칸으로 정리하며, 이미지에 포함된 글자는 세지 않습니다. 같은 사진을 여러 곳에 넣었다면 각각 셉니다. 지원하지 않는 글 형식이나 접근할 수 없는 글은 집계 불가로 표시합니다. 정상 결과는 24시간, 실패한 집계는 1시간 뒤 화면을 열면 갱신합니다.</p><p>로그인하거나 로그인 상태로 사이트에 다시 접속하면 공개 RSS의 최근 글을 수집합니다. 이 화면을 열거나 새로고침할 때도 새 글 수집을 요청하며, 짧은 시간의 반복 요청은 합쳐 처리합니다. 네이버 RSS 반영에 시간이 걸릴 수 있습니다. 처음 연결하면 RSS에서 제공하는 최근 글부터 누적하며, 공개·외부 공유 설정에 따라 수집 범위가 달라질 수 있습니다.</p><p>검색 노출 점검 버튼을 누르면 새 글을 먼저 가져온 뒤 최근 20개를 대상으로 제목과 제목의 앞부분을 검색하고, 검색어별 정확도순 최대 100개 결과에서 글 주소가 일치하는지 확인합니다. 검색어 하나에서 찾으면 확인을 마칩니다. 오래된 글의 상태는 마지막 확인 기록입니다.</p><p>‘노출 미확인’은 검색 누락이나 저품질 확정이 아닙니다. 실제 통합검색 순위와도 다릅니다. 오류·연결 대기는 검색 미확인으로 집계하지 않습니다.</p><p>검색 노출 점검은 계정당 하루 3회이며 한국시간 자정에 초기화됩니다. 한 번 누르면 최근 글 최대 20개를 점검합니다. 글 수집과 화면 새로고침은 횟수를 사용하지 않습니다. 검색을 시작한 요청은 오류가 나도 1회에 포함되며, 진행 중인 요청의 중복 클릭은 추가로 차감하지 않습니다. 검색 점검은 키온 전체 회원 합산 하루 20,000회·월 600,000회 이내에서 진행합니다. 한도에 도달하거나 요청 후 1시간이 지나면 해당 요청을 종료하며, 나중에 버튼을 눌러 다시 요청해야 합니다. 검색 점검이 중지되어도 최근 글 수집과 기존 확인 기록은 유지됩니다.</p></details></section>
+      <details class="analysis-method"><summary>수집 범위와 노출 확인 기준</summary><p>본문 통계는 공개된 글의 일반 텍스트·인용문·표·사진 설명과 본문 사진을 기준으로 합니다. 제목·댓글·프로필·광고·링크 미리보기·지도·수식·스티커·동영상은 제외합니다. 연속 공백과 줄바꿈은 공백 한 칸으로 정리하며, 이미지에 포함된 글자는 세지 않습니다. 같은 사진을 여러 곳에 넣었다면 각각 셉니다. 지원하지 않는 글 형식이나 접근할 수 없는 글은 집계 불가로 표시합니다. 정상 결과는 24시간, 실패한 집계는 1시간 뒤 화면을 열면 갱신합니다.</p><p>로그인하거나 로그인 상태로 사이트에 다시 접속하면 공개 RSS의 최근 글을 수집합니다. 대시보드에 있을 때 분석 정보를 미리 불러와 화면에 들어오면 먼저 보여드립니다. 필요하면 새 글·키챌 정보 갱신 버튼으로 다시 요청할 수 있습니다. 네이버 RSS 반영에 시간이 걸릴 수 있습니다. 처음 연결하면 RSS에서 제공하는 최근 글부터 누적하며, 공개·외부 공유 설정에 따라 수집 범위가 달라질 수 있습니다.</p><p>검색 노출 점검 버튼을 누르면 새 글을 먼저 가져온 뒤 최근 20개를 대상으로 제목과 제목의 앞부분을 검색하고, 검색어별 정확도순 최대 100개 결과에서 글 주소가 일치하는지 확인합니다. 검색어 하나에서 찾으면 확인을 마칩니다. 오래된 글의 상태는 마지막 확인 기록입니다.</p><p>‘노출 미확인’은 검색 누락이나 저품질 확정이 아닙니다. 실제 통합검색 순위와도 다릅니다. 오류·연결 대기는 검색 미확인으로 집계하지 않습니다.</p><p>검색 노출 점검은 계정당 하루 3회이며 한국시간 자정에 초기화됩니다. 한 번 누르면 최근 글 최대 20개를 점검합니다. 글 수집과 화면 새로고침은 횟수를 사용하지 않습니다. 검색을 시작한 요청은 오류가 나도 1회에 포함되며, 진행 중인 요청의 중복 클릭은 추가로 차감하지 않습니다. 검색 점검은 키온 전체 회원 합산 하루 20,000회·월 600,000회 이내에서 진행합니다. 한도에 도달하거나 요청 후 1시간이 지나면 해당 요청을 종료하며, 나중에 버튼을 눌러 다시 요청해야 합니다. 검색 점검이 중지되어도 최근 글 수집과 기존 확인 기록은 유지됩니다.</p></details></section>
     </div>`;
   const admin=document.createElement('section');admin.className='panel admin-panel searchad-settings';admin.hidden=true;admin.innerHTML=`<div id="blogApiSetupIntro" hidden><p class="eyebrow">BLOG SEARCH CONNECTION</p><h2>블로그 검색 노출 점검 연결</h2><p class="muted">네이버 클라우드의 NAVER API HUB에서 ‘블로그 — NAVER Search Blog API’를 등록해 주세요. 기존 검색광고 API와 별도 연결입니다. 일반 회원은 블로그 주소만 등록하면 됩니다.</p>
     <p><a href="https://guide.ncloud-docs.com/docs/apihub-application" target="_blank" rel="noopener noreferrer">API HUB 등록·한도 설정 안내 ↗</a> · <a href="https://www.ncloud.com/product/applicationService/naverApiHub" target="_blank" rel="noopener noreferrer">현재 요금 확인 ↗</a></p></div>
@@ -32,7 +46,7 @@ export function createBlogAnalysis(client, getProfile = () => '', refreshProfile
     <div id="blogApiActions" class="analysis-admin-actions" hidden><button id="blogApiConfirm" class="button button-light" hidden>무료 정책 재확인 · 사용 허용</button><button id="blogApiPause" class="button button-quiet" hidden>검색 점검 일시 중지</button></div><p id="blogApiMessage" class="message" role="status" hidden></p>`;
   $('catalogAdmin').insertBefore(admin,$('searchadSettings'));
   function message(text,error=false){$('analysisMessage').textContent=text;$('analysisMessage').className=`message ${error?'error':''}`;}
-  function schedule(active,nextAt=null){clearTimeout(pollTimer);if(!visible||!user||document.hidden)return;if(active)pollTimer=setTimeout(()=>void load(),10000);else if(nextAt&&nextAt>Date.now())pollTimer=setTimeout(()=>void load(),Math.min(2147483647,nextAt-Date.now()+1000));}
+  function schedule(active,nextAt=null){clearTimeout(pollTimer);if(!visible||!user||document.hidden)return;if(active)pollTimer=setTimeout(()=>void load(true),10000);else if(nextAt&&nextAt>Date.now())pollTimer=setTimeout(()=>void load(true),Math.min(2147483647,nextAt-Date.now()+1000));}
   function activity(data){
     const kstToday=new Date(Date.now()+9*60*60*1000).toISOString().slice(0,10);
     const monday=new Date(`${kstToday}T00:00:00Z`);
@@ -50,7 +64,7 @@ export function createBlogAnalysis(client, getProfile = () => '', refreshProfile
     $('analysisActivity').innerHTML=`<div class="analysis-summary"><div><small>최근 발행일</small><strong>${esc(date(data.latest_post))}</strong></div><div><small>최근 글의 평균 발행 간격</small><strong>${data.average_gap_days==null?'집계 대기':`${esc(data.average_gap_days)}일`}</strong></div></div><div class="analysis-bars">${weeks.map(w=>`<div><span>${esc(monthDay(w.start))}-${esc(monthDay(w.end))}</span><div class="analysis-bar-track"><i style="width:${Math.round(w.count/max*100)}%"></i></div><strong>${w.count}편</strong></div>`).join('')}</div>`;
   }
   function bodyMetrics(item){ const m=item.body_metrics; const status=item.body_metrics_status||'pending'; const valid=m&&['characters_with_spaces','characters_without_spaces','images'].every(k=>Number.isInteger(m[k])&&m[k]>=0); const state=status==='queued'?'갱신 대기':status==='unavailable'?'집계 불가':''; if(!valid)return `<div class="analysis-body-metrics"><p class="muted small">${status==='unavailable'?'본문 집계 불가':'본문 글자 수·이미지 수 집계 대기'}</p>${item.body_metrics_error?`<p class="muted small">${esc(item.body_metrics_error)}</p>`:''}</div>`; return `<div class="analysis-body-metrics"><div class="analysis-body-values"><span>글자 수 <b>${num(m.characters_with_spaces)}자</b> <small>공백 포함</small></span><span><b>${num(m.characters_without_spaces)}자</b> <small>공백 제외</small></span><span>이미지 <b>${num(m.images)}장</b></span></div><p class="muted small">${state?`${state} · 이전 `:''}집계 ${esc(stamp(item.body_metrics_at))}${item.body_metrics_title&&item.body_metrics_title!==item.title?' · 집계 후 제목 변경':''}</p>${item.body_metrics_error?`<p class="muted small">${esc(item.body_metrics_error)}</p>`:''}</div>`; }
-  async function requestBodyMetrics(items,g){if(!user||!visible||metricsBusy)return; const now=Date.now();const due=items.filter(item=>item.body_metrics_status!=='queued'&&(!item.body_metrics_attempted_at||Date.parse(item.body_metrics_attempted_at)<now-(item.body_metrics_status==='unavailable'?3600000:86400000))&&(!metricsRequests.has(item.blog_id+'/'+item.post_id)||metricsRequests.get(item.blog_id+'/'+item.post_id)<now-60000));if(!due.length)return;metricsBusy=true;due.forEach(item=>metricsRequests.set(item.blog_id+'/'+item.post_id,now));try{const {data,error}=await client.rpc('keychallenge_request_blog_metrics',{p_post_ids:due.map(item=>item.post_id)});if(g!==epoch)return;if(error)throw error;$('analysisMetricsMessage').textContent='';if(data?.queued>0&&visible)await load();}catch{if(g===epoch&&visible)$('analysisMetricsMessage').textContent='본문 집계를 요청하지 못했습니다. 기존 검색 결과는 그대로 유지됩니다. 잠시 후 화면을 새로고침해 주세요.';}finally{if(g===epoch)metricsBusy=false;}}
+  async function requestBodyMetrics(items,g){if(!user||!visible||metricsBusy)return; const now=Date.now();const due=items.filter(item=>item.body_metrics_status!=='queued'&&(!item.body_metrics_attempted_at||Date.parse(item.body_metrics_attempted_at)<now-(item.body_metrics_status==='unavailable'?3600000:86400000))&&(!metricsRequests.has(item.blog_id+'/'+item.post_id)||metricsRequests.get(item.blog_id+'/'+item.post_id)<now-60000));if(!due.length)return;metricsBusy=true;due.forEach(item=>metricsRequests.set(item.blog_id+'/'+item.post_id,now));try{const {data,error}=await client.rpc('keychallenge_request_blog_metrics',{p_post_ids:due.map(item=>item.post_id)});if(g!==epoch)return;if(error)throw error;$('analysisMetricsMessage').textContent='';if(data?.queued>0&&visible)await load(true);}catch{if(g===epoch&&visible)$('analysisMetricsMessage').textContent='본문 집계를 요청하지 못했습니다. 기존 검색 결과는 그대로 유지됩니다. 잠시 후 화면을 새로고침해 주세요.';}finally{if(g===epoch)metricsBusy=false;}}
   function titleChallenges(challenges = []) {
     const review = challenges.filter(item => item.status !== 'same');
     const same = challenges.filter(item => item.status === 'same');
@@ -70,14 +84,14 @@ export function createBlogAnalysis(client, getProfile = () => '', refreshProfile
     const changed=status!=='error'&&item.previous_result&&item.previous_result!==item.last_result;
     return `<article class="analysis-post"><div class="analysis-post-heading"><div><a class="analysis-post-title" href="${url}" target="_blank" rel="noopener noreferrer">${esc(item.title)} ↗</a><p class="muted small">발행 ${esc(date(item.published_at))} · 첫 수집 ${esc(stamp(item.first_seen_at))}</p></div><span class="analysis-state ${status}">${esc(label)}</span></div>${titleChallenges(item.challenges || [])}${bodyMetrics(item)}${changed?`<p class="analysis-change">이전 ${esc(labels[item.previous_result])} → 현재 ${esc(labels[item.last_result])}</p>`:''}${item.check_error?`<p class="message error">${esc(item.check_error)}</p>`:''}<details><summary>${item.checked_at?`확인 기록 · ${esc(stamp(item.checked_at))}`:'확인 기준 보기'}</summary>${evidence?`<ul class="analysis-evidence">${evidence}</ul>`:'<p class="muted small">검색 노출 점검 버튼을 누르면 새 글을 가져온 뒤 최근 글 최대 20개를 확인합니다. 하루 3회까지 요청할 수 있습니다.</p>'}${status==='error'&&item.last_result?`<p>마지막 정상 확인: ${esc(labels[item.last_result])} · ${esc(stamp(item.last_result_at))}</p>`:''}<p class="muted small">조회한 검색어와 범위의 결과입니다. 검색 누락 여부나 실제 통합검색 순위를 의미하지 않습니다.</p></details></article>`;
   }
-  async function load(){
+  async function load(force=false){
     if(!user||!visible)return;const g=epoch,v=++version;clearTimeout(pollTimer);
     const loading=$('analysisLoading');
     message('');
     loading.hidden=false;
     loading.textContent=retrying?'블로그 분석을 다시 불러오는 중입니다…':$('analysisContent').hidden?'블로그 분석을 불러오는 중입니다…':'블로그 분석을 갱신하는 중입니다…';
     try{
-      const {data,error}=await client.rpc('keychallenge_blog_title_dashboard',{p_review:false,p_profile:getProfile(),p_query:$('analysisQuery').value.trim(),p_status:$('analysisFilter').value,p_page:page});
+      const {data,error}=await dashboardData(force);
       if(error)throw error;if(g!==epoch||v!==version)return;
       retrying=false;loading.hidden=true;
       page=data.page||page;
@@ -117,10 +131,11 @@ export function createBlogAnalysis(client, getProfile = () => '', refreshProfile
     try{
       await load();
       if(g!==epoch)return;
+      invalidateDashboard();
       const {error}=await client.rpc('keychallenge_blog_control');
       if(error)throw error;
     }catch{failed=true;}
-    finally{if(g===epoch){refreshing=false;await load();if(failed&&visible)message('새 글 수집을 요청하지 못했습니다. 기존 글은 확인할 수 있습니다. 잠시 후 새로고침해 주세요.',true);}}
+    finally{if(g===epoch){refreshing=false;if(visible)await load(true);else prefetchDashboard(true);if(failed&&visible)message('새 글 수집을 요청하지 못했습니다. 기존 글은 확인할 수 있습니다. 잠시 후 새로고침해 주세요.',true);}}
   }
   async function refreshAll(){
     if(!user||refreshing)return;
@@ -135,7 +150,7 @@ export function createBlogAnalysis(client, getProfile = () => '', refreshProfile
         const succeeded=await refreshProfile(influencerId);
         if(succeeded){
           setProfileRefreshStatus('새 글과 키챌 참여 정보를 갱신했습니다.');
-          await load();
+          await load(true);
         }else setProfileRefreshStatus('키챌 정보를 갱신하지 못했습니다. 기존 자료는 유지됩니다.',true);
       }
     }finally{
@@ -152,13 +167,13 @@ export function createBlogAnalysis(client, getProfile = () => '', refreshProfile
       if(error)throw error;
       feedback=data.already_queued?'이미 요청한 검색 점검이 진행 중입니다.':'새 글을 가져온 뒤 최근 글 최대 20개의 검색 노출을 점검합니다. 잠시 후 결과가 표시됩니다.';
     }catch(e){feedback=e.message||'검색 점검을 요청하지 못했습니다.';failed=true;}
-    finally{if(g===epoch){busy=false;await load();message(feedback,failed);}}
+    finally{if(g===epoch){busy=false;invalidateDashboard();await load(true);message(feedback,failed);}}
   }
   $('blogCheckSearch').addEventListener('click',()=>void requestSearch());
   $('analysisQuery').addEventListener('input',()=>{clearTimeout(filterTimer);filterTimer=setTimeout(()=>{page=1;void load();},300);});
   $('analysisFilter').addEventListener('change',()=>{page=1;void load();});
   $('analysisPrev').addEventListener('click',()=>{page=Math.max(1,page-1);void load();});$('analysisNext').addEventListener('click',()=>{page++;void load();});
-  document.addEventListener('visibilitychange',()=>{if(document.hidden)clearTimeout(pollTimer);else if(visible)void load();});
+  document.addEventListener('visibilitychange',()=>{if(document.hidden)clearTimeout(pollTimer);else if(visible)void load(true);});
   function connectionNotice(data){
     if(!data?.configured)return '운영자의 네이버 API HUB 연결을 기다리고 있습니다.';
     if(!data.enabled)return data.stop_reason==='credentials'?'네이버 API HUB 연결 정보 확인이 필요해 검색 점검을 중지했습니다.':'운영자가 검색 점검을 일시 중지했습니다.';
@@ -213,5 +228,5 @@ export function createBlogAnalysis(client, getProfile = () => '', refreshProfile
   $('blogApiForm').addEventListener('submit',e=>{e.preventDefault();void saveConnection('save');});
   $('blogApiPause').addEventListener('click',()=>void saveConnection('pause'));
   $('blogApiConfirm').addEventListener('click',()=>void saveConnection('confirm'));
-  return {refresh(){if(visible)return load();},setProfileRefreshStatus(text,error=false){const node=$('analysisProfileRefresh');clearTimeout(profileRefreshTimer);node.hidden=!text;node.textContent=text||'';node.className=error?'message error':'analysis-loading';if(text&&!error&&!text.includes('갱신하고 있습니다'))profileRefreshTimer=setTimeout(()=>{node.hidden=true;},8000);},setUser(next){if(user?.id===next?.id)return;clearTimeout(profileRefreshTimer);$('analysisProfileRefresh').hidden=true;retrying=false;$('analysisLoading').hidden=true;user=next;epoch++;version++;connectionVersion++;canManageApi=false;admin.hidden=true;for(const id of ['blogApiSetupIntro','blogApiForm','blogApiActions','blogApiMessage'])$(id).hidden=true;page=1;busy=false;refreshing=false;metricsBusy=false;metricsRequests.clear();clearTimeout(pollTimer);clearTimeout(filterTimer);$('analysisContent').hidden=true;$('analysisQuery').value='';$('analysisFilter').value='';$('blogApiForm').reset();$('blogApiMessage').textContent='';$('blogApiSave').disabled=false;$('blogApiPause').disabled=false;$('blogApiConfirm').disabled=false;$('blogApiUsage').textContent='';message('');if(user){void connection();void refreshPosts();}},show(name){const wasVisible=visible;visible=name==='blogAnalysisView';if(visible)void load();else clearTimeout(pollTimer);if(name==='catalogAdmin')void connection(true);}};
+  return {refresh(){invalidateDashboard();if(visible)return load(true);prefetchDashboard(true);},prefetchDashboard(force=false){prefetchDashboard(force);},setProfileRefreshStatus(text,error=false){const node=$('analysisProfileRefresh');clearTimeout(profileRefreshTimer);node.hidden=!text;node.textContent=text||'';node.className=error?'message error':'analysis-loading';if(text&&!error&&!text.includes('갱신하고 있습니다'))profileRefreshTimer=setTimeout(()=>{node.hidden=true;},8000);},setUser(next){if(user?.id===next?.id)return;clearTimeout(profileRefreshTimer);$('analysisProfileRefresh').hidden=true;retrying=false;$('analysisLoading').hidden=true;user=next;epoch++;version++;connectionVersion++;canManageApi=false;admin.hidden=true;for(const id of ['blogApiSetupIntro','blogApiForm','blogApiActions','blogApiMessage'])$(id).hidden=true;page=1;busy=false;refreshing=false;metricsBusy=false;metricsRequests.clear();clearTimeout(pollTimer);clearTimeout(filterTimer);invalidateDashboard();$('analysisContent').hidden=true;$('analysisQuery').value='';$('analysisFilter').value='';$('blogApiForm').reset();$('blogApiMessage').textContent='';$('blogApiSave').disabled=false;$('blogApiPause').disabled=false;$('blogApiConfirm').disabled=false;$('blogApiUsage').textContent='';message('');if(user){void connection();void refreshPosts();}},show(name){const wasVisible=visible;visible=name==='blogAnalysisView';if(visible)void load();else {clearTimeout(pollTimer);if(name==='strategyView'||name==='bloggerView')prefetchDashboard();}if(name==='catalogAdmin')void connection(true);}};
 }
