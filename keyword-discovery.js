@@ -50,7 +50,7 @@ export function createTopicDiscovery(client,{root,onSaved=()=>{}}){
   const comboSubmit=comboPanel.querySelector('[data-combo-submit]');
   const comboStatus=comboPanel.querySelector('[data-combo-status]');
   const comboResults=comboPanel.querySelector('[data-combo-results]');
-  let comboOptions=[],comboSelected=new Set(),comboRequest=0,comboController=null,comboLoading=false;
+  let comboOptions=[],comboSelected=new Set(),comboRequest=0,comboController=null,comboLoading=false,competitionInFlight=new Set();
   const comboStopwords=new Set(['오늘','좋은','좋았던','알아보기','소개','그리고','하는','위한','다녀와서','직접']);
   function extractComboSeeds(value){
     const tokens=String(value||'').split(/[\\s,·|/]+/).map(word=>word.replace(/(에서|으로|부터|까지|에게|은|는|이|가|을|를|에|의|와|과|도|만)$/,'').trim()).filter(word=>word.length>=2&&!comboStopwords.has(word));
@@ -92,13 +92,42 @@ export function createTopicDiscovery(client,{root,onSaved=()=>{}}){
       }
       const rows=[...merged.values()].map(item=>({...item,matched:recentTitles.some(title=>title.includes(item.keyword_key)||item.keyword_key.includes(title))}));
       rows.sort((a,b)=>Number(a.matched)-Number(b.matched)||(b.volume_max||0)-(a.volume_max||0)||a.keyword.localeCompare(b.keyword,'ko'));
-      comboResults.innerHTML=rows.length?rows.slice(0,10).map((row,index)=>'<article class="opportunity-card"><span class="count-chip">'+(row.matched?'최근 글 제목에 포함':'새 조합 후보')+'</span><h3><span class="combo-rank">'+(index+1)+'</span> '+esc(row.keyword)+'</h3><dl class="opportunity-metrics"><div><dt>월 검색량 합계</dt><dd>'+range(row.volume_min,row.volume_max)+'</dd></div><div><dt>조합 기준 키워드</dt><dd>'+row.seeds.map(esc).join(' · ')+'</dd></div></dl><p class="muted small">'+(row.matched?'최근 글 제목에서 비슷한 키워드를 찾았습니다.':'최근 글 제목 최대 50편에서 찾지 못한 조합입니다.')+'</p><div class="opportunity-card-footer"><small class="muted">'+date(row.collected_at)+' 조회 · 월 검색량</small><button class="button button-light" data-combo-save="'+esc(row.keyword_key)+'" '+(saved.has(row.keyword_key)?'disabled':'')+'>'+(saved.has(row.keyword_key)?'보관됨 ✓':'보관함 담기')+'</button></div></article>').join(''):'<div class="work-empty">관련 키워드를 찾지 못했습니다. 제목을 바꾸거나 다른 핵심어를 선택해 주세요.</div>';
+      comboResults.innerHTML=rows.length?rows.slice(0,10).map((row,index)=>'<article class="opportunity-card" data-combo-card="'+esc(row.keyword_key)+'"><span class="count-chip">'+(row.matched?'최근 글 제목에 포함':'새 조합 후보')+'</span><h3><span class="combo-rank">'+(index+1)+'</span> '+esc(row.keyword)+'</h3><dl class="opportunity-metrics"><div><dt>월 검색량 합계</dt><dd>'+range(row.volume_min,row.volume_max)+'</dd></div><div><dt>조합 기준 키워드</dt><dd>'+row.seeds.map(esc).join(' · ')+'</dd></div></dl><p class="muted small">'+(row.matched?'최근 글 제목에서 비슷한 키워드를 찾았습니다.':'최근 글 제목 최대 50편에서 찾지 못한 조합입니다.')+'</p><div class="competition-action"><button class="button button-light" type="button" data-combo-competition="'+esc(row.keyword)+'">경쟁 확인</button><div class="competition-result muted small" data-competition-result></div></div><div class="opportunity-card-footer"><small class="muted">'+date(row.collected_at)+' 조회 · 월 검색량</small><button class="button button-light" data-combo-save="'+esc(row.keyword_key)+'" '+(saved.has(row.keyword_key)?'disabled':'')+'>'+(saved.has(row.keyword_key)?'보관됨 ✓':'보관함 담기')+'</button></div></article>').join(''):'<div class="work-empty">관련 키워드를 찾지 못했습니다. 제목을 바꾸거나 다른 핵심어를 선택해 주세요.</div>';
       comboStatus.textContent=completed+' / '+seeds.length+'개 키워드 조회 완료'+(failures.length?' · 일부 결과만 표시합니다. '+failures.join(' / '):' · 월 검색량 기준 후보이며 실제 노출 순위는 아닙니다.');
     }catch(error){if(g===epoch&&v===comboRequest&&error.name!=='AbortError')comboStatus.textContent=error.message||'키워드 조합을 불러오지 못했습니다.';}
     finally{if(g===epoch&&v===comboRequest){comboLoading=false;renderComboSeeds();}}
   });
+  async function checkCompetition(button){
+    const keyword=button.dataset.comboCompetition;
+    const normalized=key(keyword);
+    if(competitionInFlight.has(normalized)||!user)return;
+    const card=button.closest('[data-combo-card]');
+    const resultNode=card?.querySelector('[data-competition-result]');
+    const g=epoch;
+    competitionInFlight.add(normalized);button.disabled=true;button.textContent='검색 결과 확인 중…';
+    try{
+      const {data:{session}}=await client.auth.getSession();
+      if(g!==epoch)return;
+      if(!session||session.user.id!==user.id)throw Error('다시 로그인해 주세요.');
+      const response=await fetch(window.APP_CONFIG.SUPABASE_URL+'/functions/v1/keychallenge-keyword-competition',{
+        method:'POST',headers:{apikey:window.APP_CONFIG.SUPABASE_ANON_KEY,Authorization:'Bearer '+session.access_token,'Content-Type':'application/json'},
+        body:JSON.stringify({keyword})
+      });
+      const result=await response.json();
+      if(g!==epoch)return;
+      if(!response.ok)throw Error(result.error||'경쟁 정보를 확인하지 못했습니다.');
+      const rank=result.own_blog_rank?'<span>내 블로그 검색 결과 '+num(result.own_blog_rank)+'위</span>':'<span>내 블로그 결과 미확인</span>';
+      resultNode.innerHTML='<strong>검색 경쟁 신호 · '+esc(result.signal)+'</strong><p>'+esc(result.reason)+'</p><p>상위 '+num(result.sample_count)+'개 중 키워드 포함 제목 '+num(result.matching_titles)+'개 · 최근 90일 글 '+num(result.recent_posts_90d)+'개 · 검색 결과 '+num(result.total_results)+'개</p><p>'+rank+' · 오늘 '+num(result.used_today)+' / '+num(result.daily_limit)+'회 사용</p><small>'+esc(new Date(result.checked_at).toLocaleString('ko-KR',{timeZone:'Asia/Seoul'}))+' 기준 · '+esc(result.caveat)+'</small>';
+      button.textContent='다시 확인';
+    }catch(error){
+      if(g===epoch){resultNode.textContent=error.message||'경쟁 정보를 확인하지 못했습니다.';button.textContent='다시 확인';}
+    }finally{
+      competitionInFlight.delete(normalized);
+      if(g===epoch)button.disabled=false;
+    }
+  }
   comboPanel.addEventListener('click',async event=>{
-    const button=event.target.closest('[data-combo-save]');if(!button||button.disabled||!user)return;
+    const check=event.target.closest('[data-combo-competition]');if(check){await checkCompetition(check);return;}\n    const button=event.target.closest('[data-combo-save]');if(!button||button.disabled||!user)return;
     const g=epoch;button.disabled=true;button.textContent='보관 중…';
     try{const result=await client.rpc('keychallenge_save_blog_keyword',{p_keyword:button.dataset.comboSave});if(g!==epoch)return;if(result.error)throw result.error;saved.add(button.dataset.comboSave);button.textContent='보관됨 ✓';onSaved();}
     catch(error){if(g===epoch){button.disabled=false;button.textContent='보관함 담기';comboStatus.textContent=error.message||'보관하지 못했습니다.';}}
