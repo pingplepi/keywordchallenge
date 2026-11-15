@@ -26,7 +26,7 @@ export function createTopicDiscovery(client,{root,onSaved=()=>{}}){
   const saved=new Set();
   const direct=[...root.querySelectorAll(':scope > section')];
   const nav=document.createElement('div');nav.className='opportunity-tabs discovery-search-tabs';nav.setAttribute('role','tablist');nav.setAttribute('aria-label','키워드 찾는 방법');
-  const methods=[['personal','맞춤 추천','personalKeywordTab','personalKeywordPanel'],['opportunity','기회 찾기','opportunitiesKeywordTab','opportunitiesKeywordPanel'],['topic','주제별 추천','topicKeywordTab','topicKeywordPanel'],['direct','직접 검색','directKeywordTab','directKeywordPanel'],['draft','제목으로 키챌 찾기','draftKeywordTab','draftKeywordPanel']];
+  const methods=[['personal','맞춤 추천','personalKeywordTab','personalKeywordPanel'],['opportunity','기회 찾기','opportunitiesKeywordTab','opportunitiesKeywordPanel'],['topic','주제별 추천','topicKeywordTab','topicKeywordPanel'],['combo','키워드 조합 추천','comboKeywordTab','comboKeywordPanel'],['direct','직접 검색','directKeywordTab','directKeywordPanel'],['draft','제목으로 키챌 찾기','draftKeywordTab','draftKeywordPanel']];
   nav.innerHTML=methods.map(([id,label,button,panel])=>'<button type="button" role="tab" id="'+button+'" aria-controls="'+panel+'" aria-selected="'+(id===tab)+'" tabindex="'+(id===tab?0:-1)+'" data-discovery-tab="'+id+'">'+label+'</button>').join('');
   const directPanel=document.createElement('div');directPanel.id='directKeywordPanel';directPanel.setAttribute('role','tabpanel');directPanel.setAttribute('aria-labelledby','directKeywordTab');direct.forEach(el=>directPanel.append(el));root.append(nav,directPanel);
   const panel=document.createElement('section');panel.id='topicKeywordPanel';panel.className='panel work-panel topic-discovery';panel.hidden=true;panel.setAttribute('role','tabpanel');panel.setAttribute('aria-labelledby','topicKeywordTab');
@@ -41,6 +41,68 @@ export function createTopicDiscovery(client,{root,onSaved=()=>{}}){
   draft.setAttribute('aria-labelledby','draftKeywordTab');
   draft.innerHTML=`<h2>제목으로 키챌 찾기</h2><label>작성할 글 제목<input type="text" maxlength="200" placeholder="예: 나트랑 마사지 후기" /></label><p class="muted small" role="status"></p><div data-draft-results></div>`;
   root.append(draft);
+  const comboPanel=document.createElement('section');
+  comboPanel.id='comboKeywordPanel';comboPanel.className='panel work-panel';comboPanel.hidden=true;comboPanel.setAttribute('role','tabpanel');comboPanel.setAttribute('aria-labelledby','comboKeywordTab');
+  comboPanel.innerHTML='<h2>키워드 조합 추천</h2><p class="muted">글 제목이나 주제에서 핵심 키워드를 골라, 내 최근 글 제목에 없는 연관 검색어 조합을 찾아보세요.</p><form data-combo-form><label>글 제목 또는 주제<input data-combo-title type="text" maxlength="200" placeholder="예: 나트랑 마사지 가격과 공항 픽업 후기" /></label><p class="muted small">제목에서 핵심어를 찾아드립니다. 분석에 사용할 키워드를 1~3개 선택해 주세요.</p><div class="combo-seeds" data-combo-seeds></div><button class="button" type="submit" data-combo-submit disabled>키워드 조합 찾기</button></form><p class="message" role="status" data-combo-status></p><div class="opportunity-grid" data-combo-results></div><details class="score-note opportunity-method"><summary>추천 기준과 데이터 범위</summary><p>선택한 핵심어와 연관된 네이버 검색광고 키워드 및 월 검색량을 조회하고, 연결된 블로그의 최근 글 제목 최대 50편과 비교해 아직 다루지 않은 후보를 우선 보여드립니다.</p><p>검색량은 검색 수요 참고값입니다. 네이버 통합검색의 실제 노출 순위나 상위 노출을 예측·보장하지 않습니다. 본문과 과거 전체 글은 비교하지 않습니다.</p></details>';
+  root.append(comboPanel);
+  const comboTitle=comboPanel.querySelector('[data-combo-title]');
+  const comboSeeds=comboPanel.querySelector('[data-combo-seeds]');
+  const comboSubmit=comboPanel.querySelector('[data-combo-submit]');
+  const comboStatus=comboPanel.querySelector('[data-combo-status]');
+  const comboResults=comboPanel.querySelector('[data-combo-results]');
+  let comboOptions=[],comboSelected=new Set(),comboRequest=0,comboController=null,comboLoading=false;
+  const comboStopwords=new Set(['오늘','좋은','좋았던','알아보기','소개','그리고','하는','위한','다녀와서','직접']);
+  function extractComboSeeds(value){
+    const tokens=String(value||'').split(/[\\s,·|/]+/).map(word=>word.replace(/(에서|으로|부터|까지|에게|은|는|이|가|을|를|에|의|와|과|도|만)$/,'').trim()).filter(word=>word.length>=2&&!comboStopwords.has(word));
+    return [...new Map(tokens.map(word=>[key(word),word])).values()].slice(0,12);
+  }
+  function renderComboSeeds(){
+    comboSeeds.innerHTML=comboOptions.length?comboOptions.map(word=>'<button type="button" class="button button-light" data-combo-seed="'+esc(word)+'" aria-pressed="'+comboSelected.has(key(word))+'">'+esc(word)+'</button>').join(''):'<p class="muted small">제목이나 주제를 입력하면 분석 키워드가 여기에 표시됩니다.</p>';
+    comboSubmit.disabled=comboLoading||comboSelected.size<1||comboSelected.size>3;
+  }
+  comboTitle.addEventListener('input',()=>{
+    comboOptions=extractComboSeeds(comboTitle.value);
+    comboSelected=new Set(comboOptions.slice(0,3).map(key));
+    renderComboSeeds();
+  });
+  comboSeeds.addEventListener('click',event=>{
+    const button=event.target.closest('[data-combo-seed]');if(!button||comboLoading)return;
+    const normalized=key(button.dataset.comboSeed);
+    if(comboSelected.has(normalized))comboSelected.delete(normalized);
+    else if(comboSelected.size<3)comboSelected.add(normalized);
+    renderComboSeeds();
+  });
+  comboPanel.addEventListener('submit',async event=>{
+    event.preventDefault();if(!user||comboLoading)return;
+    const seeds=comboOptions.filter(word=>comboSelected.has(key(word))).slice(0,3);
+    if(!seeds.length){comboStatus.textContent='분석할 키워드를 1~3개 선택해 주세요.';return;}
+    const g=epoch,v=++comboRequest;comboController?.abort();comboController=new AbortController();comboLoading=true;renderComboSeeds();comboResults.replaceChildren();comboStatus.textContent='키워드 조합과 검색량을 확인하고 있어요…';
+    const merged=new Map(),failures=[];let completed=0;
+    try{
+      const {data:{session}}=await client.auth.getSession();if(g!==epoch||v!==comboRequest)return;if(!session||session.user.id!==user.id)throw Error('다시 로그인해 주세요.');
+      let recentTitles=[];
+      if(settings?.blog_id){const posts=await client.from('keychallenge_blog_posts').select('title').eq('user_id',user.id).eq('blog_id',settings.blog_id).order('published_at',{ascending:false,nullsFirst:false}).order('first_seen_at',{ascending:false}).limit(50);if(g!==epoch||v!==comboRequest)return;if(posts.error)throw Error('최근 글을 비교하지 못했습니다. 잠시 후 다시 시도해 주세요.');recentTitles=(posts.data||[]).map(post=>key(post.title));}
+      for(const seed of seeds){
+        if(g!==epoch||v!==comboRequest)return;
+        const response=await fetch(window.APP_CONFIG.SUPABASE_URL+'/functions/v1/keychallenge-keyword-search',{method:'POST',signal:comboController.signal,headers:{apikey:window.APP_CONFIG.SUPABASE_ANON_KEY,Authorization:'Bearer '+session.access_token,'Content-Type':'application/json'},body:JSON.stringify({query:seed,sort:'volume'})});
+        const result=await response.json();if(g!==epoch||v!==comboRequest)return;
+        if(!response.ok){failures.push(seed+': '+(result.error||'조회 실패'));if([401,403,429,503].includes(response.status))break;continue;}
+        completed++;
+        for(const item of result.items||[]){const old=merged.get(item.keyword_key);if(!old)merged.set(item.keyword_key,{...item,collected_at:item.collected_at||result.collected_at,seeds:[seed]});else if(!old.seeds.includes(seed))old.seeds.push(seed);}
+      }
+      const rows=[...merged.values()].map(item=>({...item,matched:recentTitles.some(title=>title.includes(item.keyword_key)||item.keyword_key.includes(title))}));
+      rows.sort((a,b)=>Number(a.matched)-Number(b.matched)||(b.volume_max||0)-(a.volume_max||0)||a.keyword.localeCompare(b.keyword,'ko'));
+      comboResults.innerHTML=rows.length?rows.slice(0,10).map((row,index)=>'<article class="opportunity-card"><span class="count-chip">'+(row.matched?'최근 글 제목에 포함':'새 조합 후보')+'</span><h3><span class="combo-rank">'+(index+1)+'</span> '+esc(row.keyword)+'</h3><dl class="opportunity-metrics"><div><dt>월 검색량 합계</dt><dd>'+range(row.volume_min,row.volume_max)+'</dd></div><div><dt>조합 기준 키워드</dt><dd>'+row.seeds.map(esc).join(' · ')+'</dd></div></dl><p class="muted small">'+(row.matched?'최근 글 제목에서 비슷한 키워드를 찾았습니다.':'최근 글 제목 최대 50편에서 찾지 못한 조합입니다.')+'</p><div class="opportunity-card-footer"><small class="muted">'+date(row.collected_at)+' 조회 · 월 검색량</small><button class="button button-light" data-combo-save="'+esc(row.keyword_key)+'" '+(saved.has(row.keyword_key)?'disabled':'')+'>'+(saved.has(row.keyword_key)?'보관됨 ✓':'보관함 담기')+'</button></div></article>').join(''):'<div class="work-empty">관련 키워드를 찾지 못했습니다. 제목을 바꾸거나 다른 핵심어를 선택해 주세요.</div>';
+      comboStatus.textContent=completed+' / '+seeds.length+'개 키워드 조회 완료'+(failures.length?' · 일부 결과만 표시합니다. '+failures.join(' / '):' · 월 검색량 기준 후보이며 실제 노출 순위는 아닙니다.');
+    }catch(error){if(g===epoch&&v===comboRequest&&error.name!=='AbortError')comboStatus.textContent=error.message||'키워드 조합을 불러오지 못했습니다.';}
+    finally{if(g===epoch&&v===comboRequest){comboLoading=false;renderComboSeeds();}}
+  });
+  comboPanel.addEventListener('click',async event=>{
+    const button=event.target.closest('[data-combo-save]');if(!button||button.disabled||!user)return;
+    const g=epoch;button.disabled=true;button.textContent='보관 중…';
+    try{const result=await client.rpc('keychallenge_save_blog_keyword',{p_keyword:button.dataset.comboSave});if(g!==epoch)return;if(result.error)throw result.error;saved.add(button.dataset.comboSave);button.textContent='보관됨 ✓';onSaved();}
+    catch(error){if(g===epoch){button.disabled=false;button.textContent='보관함 담기';comboStatus.textContent=error.message||'보관하지 못했습니다.';}}
+  });
   const titleInput=draft.querySelector('input');
   const draftStatus=draft.querySelector('[role="status"]');
   const draftResults=draft.querySelector('[data-draft-results]');
@@ -86,7 +148,7 @@ export function createTopicDiscovery(client,{root,onSaved=()=>{}}){
   titleInput.addEventListener('input',event=>{if(!event.isComposing)analyzeDraft();else clearDraft();});
   titleInput.addEventListener('compositionend',analyzeDraft);
   titleInput.addEventListener('keydown',event=>{if(!event.isComposing&&event.key==='Enter')analyzeDraft();});
-  const panels={personal:personalPanel,opportunity:opportunityPanel,topic:panel,direct:directPanel,draft};
+  const panels={personal:personalPanel,opportunity:opportunityPanel,topic:panel,combo:comboPanel,direct:directPanel,draft};
   function sync(){
     const mode=settings?.mode==='blogger'?'blogger':'influencer';
     for(const view of recommendationViews.values()){
@@ -143,7 +205,7 @@ export function createTopicDiscovery(client,{root,onSaved=()=>{}}){
     finally{if(g===epoch&&v===sequence)$('[data-topic-submit]').disabled=false;}
   });
   panel.addEventListener('click',async e=>{const b=e.target.closest('[data-topic-save]');if(!b||b.disabled||!user)return;const row=all.find(r=>r.keyword_key===b.dataset.topicSave);if(!row)return;const g=epoch;b.disabled=true;try{const result=await client.rpc('keychallenge_save_blog_keyword',{p_keyword:row.keyword});if(g!==epoch)return;if(result.error)throw result.error;saved.add(row.keyword_key);render();onSaved();}catch(error){if(g===epoch){b.disabled=false;$('[data-topic-status]').textContent=error.message||'보관하지 못했습니다.';}}});
-  return {direct:()=>choose('direct'),show(page){visible=page==='keywordSearchView';sync();},setContext(next,nextSettings){clearDraft();titleInput.value='';epoch++;sequence++;controller?.abort();user=next;settings=nextSettings;all=[];titles=[];postCount=0;saved.clear();$('[data-topic-result]').hidden=true;$('[data-topic-submit]').disabled=false;$('[data-topic-status]').textContent='주제를 선택한 뒤 버튼을 눌러 주세요.';$('[data-topic-field]').value=Object.hasOwn(topics,normalizeInterestField(settings?.interest))?normalizeInterestField(settings.interest):'여행';$('[data-topic-seeds]').value='';seeds();choose('personal');}};
+  return {direct:()=>choose('direct'),show(page){visible=page==='keywordSearchView';sync();},setContext(next,nextSettings){clearDraft();titleInput.value='';epoch++;sequence++;controller?.abort();comboRequest++;comboController?.abort();comboLoading=false;comboTitle.value='';comboOptions=[];comboSelected.clear();comboResults.replaceChildren();comboStatus.textContent='';renderComboSeeds();user=next;settings=nextSettings;all=[];titles=[];postCount=0;saved.clear();$('[data-topic-result]').hidden=true;$('[data-topic-submit]').disabled=false;$('[data-topic-status]').textContent='주제를 선택한 뒤 버튼을 눌러 주세요.';$('[data-topic-field]').value=Object.hasOwn(topics,normalizeInterestField(settings?.interest))?normalizeInterestField(settings.interest):'여행';$('[data-topic-seeds]').value='';seeds();choose('personal');}};
 }
 export function createPersonalKeywords(client,{root,onSaved=()=>{}}){
   let user=null,profile=null,epoch=0,request=0,data=null,loading=false,loadedAt=0,seenKeys=[],previousBatches=[],viewingPrevious=false,savingKey=null,pendingRefill=null;const saved=new Set();
