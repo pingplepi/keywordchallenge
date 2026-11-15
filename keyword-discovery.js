@@ -127,7 +127,8 @@ export function createTopicDiscovery(client,{root,onSaved=()=>{}}){
     }
   }
   comboPanel.addEventListener('click',async event=>{
-    const check=event.target.closest('[data-combo-competition]');if(check){await checkCompetition(check);return;}\n    const button=event.target.closest('[data-combo-save]');if(!button||button.disabled||!user)return;
+    const check=event.target.closest('[data-combo-competition]');if(check){await checkCompetition(check);return;}
+    const button=event.target.closest('[data-combo-save]');if(!button||button.disabled||!user)return;
     const g=epoch;button.disabled=true;button.textContent='보관 중…';
     try{const result=await client.rpc('keychallenge_save_blog_keyword',{p_keyword:button.dataset.comboSave});if(g!==epoch)return;if(result.error)throw result.error;saved.add(button.dataset.comboSave);button.textContent='보관됨 ✓';onSaved();}
     catch(error){if(g===epoch){button.disabled=false;button.textContent='보관함 담기';comboStatus.textContent=error.message||'보관하지 못했습니다.';}}
