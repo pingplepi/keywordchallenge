@@ -52,7 +52,7 @@
 /* The explorer owns recommendations; dashboards keep one compact entry point. */
 .keyword-explore-shortcut { display:flex; justify-content:flex-end; }
 .discovery-search-tabs { display:grid; grid-template-columns:repeat(6,minmax(0,1fr)); gap:8px; }
-.discovery-search-tabs [role="tab"] { justify-content:center; min-height:36px; padding:6px 8px; font-size:var(--font-caption); white-space:nowrap; }
+.discovery-search-tabs [role="tab"] { justify-content:center; min-height:36px; padding:6px 8px; font-size:var(--font-label); white-space:nowrap; }
 #personalKeywordPanel > .personal-keywords { border:0; padding-top:0; margin-top:0; }
 #personalKeywordPanel[hidden], #opportunitiesKeywordPanel[hidden], #topicKeywordPanel[hidden], #opportunitiesKeywordPanel > [hidden], #personalKeywordPanel > [hidden] { display:none; }
 @media(max-width:640px) {
