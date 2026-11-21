@@ -470,8 +470,14 @@ async function handleAuthSubmit(event) {
   event.preventDefault();
   if (authBusy) return;
   const mode = authMode;
-  const email = byId('emailInput').value.trim();
+  const emailInput = byId('emailInput');
+  const email = emailInput.value.trim();
   const password = byId('passwordInput').value;
+  if (mode === 'signup' && !emailInput.validity.valid) {
+    setAuthMessage('올바른 이메일 주소를 입력해 주세요.', 'error');
+    emailInput.focus();
+    return;
+  }
   setAuthBusy(true);
   setAuthMessage(mode === 'signin' ? '로그인 중…' : '가입 요청을 처리하는 중…');
   try {
